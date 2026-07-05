@@ -1,0 +1,758 @@
+{% extends 'base.html' %}
+
+{% block title %}Traffic Analytics{% endblock %}
+{% block nav_traffic %}active{% endblock %}
+{% block page_title %}Traffic Analytics{% endblock %}
+{% block page_breadcrumb %}Visualization & Insights{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chart-card {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 14px;
+    padding: 20px;
+    height: 100%;
+  }
+  .chart-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--nw-text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chart-card-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--nw-accent);
+    border-radius: 2px;
+  }
+  .chart-wrapper { position: relative; }
+
+  /* Stat pill */
+  .nw-stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--nw-bg-card-hover);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-muted);
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+
+  /* Rank bar for top IPs / URLs */
+  .rank-bar-bg {
+    height: 6px;
+    background: var(--nw-border);
+    border-radius: 3px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .rank-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--nw-accent), #6366f1);
+    transition: width 0.8s ease;
+  }
+  .rank-bar-fill.red   { background: linear-gradient(90deg, var(--nw-danger), #f97316); }
+  .rank-bar-fill.green { background: linear-gradient(90deg, var(--nw-success), var(--nw-info)); }
+
+  /* Loading state */
+  .chart-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 240px;
+    color: var(--nw-text-muted);
+    font-size: 13px;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nw-spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--nw-border);
+    border-top-color: var(--nw-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Filter bar styling */
+  .analytics-filter-bar {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--nw-text-muted); text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .filter-input {
+    background: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-primary);
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .filter-input:focus { border-color: var(--nw-accent); }
+  .filter-btn {
+    padding: 7px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .btn-primary-nw { background: var(--nw-accent); color: white; }
+  .btn-primary-nw:hover { background: #2563eb; color: white; }
+  .btn-ghost-nw { background: var(--nw-bg-page); border: 1px solid var(--nw-border);
+    color: var(--nw-text-muted); }
+  .btn-ghost-nw:hover { color: var(--nw-text-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ─────────────────────────────────────────────────────── -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
+      Traffic Visualization & Analytics
+    </h1>
+    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
+      Chart.js powered — data refreshes every 10 seconds
+    </p>
+  </div>
+  <!-- Summary Pills -->
+  <div>
+    <span class="nw-stat-pill" id="analytics-total-requests">
+      <i class="bi bi-activity" style="color:var(--nw-accent);"></i>
+      {{ total_requests }} Total Requests
+    </span>
+    <span class="nw-stat-pill" id="analytics-total-alerts">
+      <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
+      {{ total_alerts }} Total Alerts
+    </span>
+  </div>
+</div>
+
+<form method="get" id="analytics-filter-form" class="analytics-filter-bar">
+  <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px; padding-bottom: 6px;">
+    <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
+  </div>
+
+  <!-- IP Address -->
+  <div class="filter-group">
+    <label class="filter-label">IP Address</label>
+    <input type="text" name="ip_address" value="{{ ip_address }}"
+      class="filter-input" placeholder="e.g. 192.168" style="width:130px;" />
+  </div>
+
+  <!-- Request Method -->
+  <div class="filter-group">
+    <label class="filter-label">Method</label>
+    <select name="request_method" class="filter-input">
+      <option value="">All</option>
+      <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
+      <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
+      <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
+      <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
+    </select>
+  </div>
+
+  <!-- Date From -->
+  <div class="filter-group">
+    <label class="filter-label">From Date</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
+  </div>
+
+  <!-- Date To -->
+  <div class="filter-group">
+    <label class="filter-label">To Date</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
+  </div>
+
+  <button type="submit" class="filter-btn btn-primary-nw">
+    <i class="bi bi-search"></i> Apply
+  </button>
+  <a href="{% url 'analytics' %}" class="filter-btn btn-ghost-nw">
+    <i class="bi bi-x-lg"></i> Clear
+  </a>
+</form>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ROW 1 — Time-Series Charts (Requests Per Hour + Per Day)              -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-3">
+
+  <!-- Requests Per Hour -->
+  <div class="col-xl-7">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        <i class="bi bi-clock-history" style="color:var(--nw-accent);"></i>
+        Requests Per Hour &nbsp;
+        <span style="font-size:11px; color:var(--nw-text-muted); font-weight:400;">Last 24 hours</span>
+      </div>
+      <div class="chart-wrapper">
+        <div class="chart-loading" id="hourly-loading">
+          <div class="nw-spinner"></div>
+          Loading chart data…
+        </div>
+        <canvas id="chart-hourly" height="200" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Requests Per Day -->
+  <div class="col-xl-5">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        <i class="bi bi-bar-chart-fill" style="color:var(--nw-success);"></i>
+        Requests Per Day &nbsp;
+        <span style="font-size:11px; color:var(--nw-text-muted); font-weight:400;">Last 7 days</span>
+      </div>
+      <div class="chart-wrapper">
+        <div class="chart-loading" id="daily-loading">
+          <div class="nw-spinner"></div>
+          Loading chart data…
+        </div>
+        <canvas id="chart-daily" height="200" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ROW 2 — Alert Frequency + Severity Doughnut                          -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-3">
+
+  <!-- Alert Frequency Per Day -->
+  <div class="col-xl-7">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        <i class="bi bi-shield-exclamation" style="color:var(--nw-danger);"></i>
+        Alert Frequency &nbsp;
+        <span style="font-size:11px; color:var(--nw-text-muted); font-weight:400;">Last 7 days</span>
+      </div>
+      <div class="chart-loading" id="alerts-loading">
+        <div class="nw-spinner"></div>
+        Loading chart data…
+      </div>
+      <canvas id="chart-alerts" height="200" style="display:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- Severity Doughnut -->
+  <div class="col-xl-5">
+    <div class="chart-card">
+      <div class="chart-card-title">
+        <i class="bi bi-pie-chart-fill" style="color:var(--nw-warning);"></i>
+        Alert Severity Breakdown
+      </div>
+      <div class="row align-items-center">
+        <div class="col-7">
+          <canvas id="chart-severity" height="220"></canvas>
+        </div>
+        <div class="col-5">
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <div style="font-size:11px; color:var(--nw-text-muted);">Critical</div>
+              <div id="severity-count-critical" style="font-size:20px; font-weight:700; color:var(--nw-danger);">
+                {{ alert_severity.critical }}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--nw-text-muted);">High</div>
+              <div id="severity-count-high" style="font-size:20px; font-weight:700; color:var(--nw-orange);">
+                {{ alert_severity.high }}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--nw-text-muted);">Medium</div>
+              <div id="severity-count-medium" style="font-size:20px; font-weight:700; color:var(--nw-warning);">
+                {{ alert_severity.medium }}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--nw-text-muted);">Low</div>
+              <div id="severity-count-low" style="font-size:20px; font-weight:700; color:var(--nw-info);">
+                {{ alert_severity.low }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ROW 3 — Top Source IPs + Most Accessed URLs                          -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-3">
+
+  <!-- Top Source IPs -->
+  <div class="col-xl-6">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-globe2" style="color:var(--nw-danger);"></i>
+          Top Source IP Addresses
+        </div>
+        <span class="nw-badge nw-badge-danger">Potential Threats</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+      <div style="padding:16px 20px;" id="top-ips-container">
+        {% for ip in top_ips %}
+        {% with max_count=top_ips.0.count %}
+        {% widthratio ip.count max_count 100 as calculated_width %}
+        <div style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="nw-ip">{{ ip.ip_address }}</span>
+            <span style="font-size:12px; font-weight:700; color:var(--nw-text-primary);">
+              {{ ip.count }} <span style="color:var(--nw-text-muted); font-weight:400;">reqs</span>
+            </span>
+          </div>
+          <div class="rank-bar-bg">
+            <div class="rank-bar-fill red" data-width="{{ calculated_width }}">
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="nw-empty-state">
+          <i class="bi bi-inbox"></i>
+          <p>No traffic data yet.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Most Accessed URLs -->
+  <div class="col-xl-6">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-link-45deg" style="color:var(--nw-accent);"></i>
+          Most Accessed URLs
+        </div>
+        <span class="nw-badge nw-badge-info">Endpoint Analysis</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+      <div style="padding:16px 20px;">
+        {% for url in top_urls %}
+        {% with max_count=top_urls.0.count %}
+        {% widthratio url.count max_count 100 as calculated_width %}
+        <div style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="nw-url" style="max-width:220px;" title="{{ url.url_accessed }}">
+              {{ url.url_accessed }}
+            </span>
+            <span style="font-size:12px; font-weight:700; color:var(--nw-text-primary);">
+              {{ url.count }} <span style="color:var(--nw-text-muted); font-weight:400;">hits</span>
+            </span>
+          </div>
+          <div class="rank-bar-bg">
+            <div class="rank-bar-fill" data-width="{{ calculated_width }}">
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="nw-empty-state">
+          <i class="bi bi-inbox"></i>
+          <p>No URL data yet.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ROW 4 — HTTP Method Breakdown                                         -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="row g-3">
+  <div class="col-12">
+    <div class="nw-card"
+      style="background:linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06)); border-color:rgba(59,130,246,0.15);">
+      <div class="d-flex align-items-center gap-4 flex-wrap">
+        <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:8px;">
+          HTTP Method Distribution
+        </div>
+        {% for m in method_counts %}
+        <div style="display:flex; align-items:center; gap:10px;">
+          {% if m.request_method == 'GET' %}
+          <span class="nw-method nw-method-get">GET</span>
+          {% elif m.request_method == 'POST' %}
+          <span class="nw-method nw-method-post">POST</span>
+          {% else %}
+          <span class="nw-method nw-method-other">{{ m.request_method }}</span>
+          {% endif %}
+          <span style="font-size:15px; font-weight:700; color:var(--nw-text-primary);">
+            {{ m.count }}
+          </span>
+          <span style="font-size:11px; color:var(--nw-text-muted);">requests</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<!-- Chart.js v4 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<script>
+(function () {
+  const ANALYTICS_POLL_MS = 10000;
+  const DATA_URL = "{% url 'analytics_data' %}?ip_address={{ ip_address }}&request_method={{ request_method }}&date_from={{ date_from }}&date_to={{ date_to }}";
+
+  // Apply widths from data-width attributes to satisfy static validation checks
+  document.querySelectorAll('.rank-bar-fill').forEach(function (el) {
+    const w = el.getAttribute('data-width');
+    if (w) el.style.width = w + '%';
+  });
+
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = '#e2e8f0';
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.font.size = 11;
+
+  const charts = {
+    hourly: null,
+    daily: null,
+    alerts: null,
+    severity: null,
+  };
+
+  function makeGradient(ctx, colorTop, colorBottom) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, colorTop);
+    gradient.addColorStop(1, colorBottom);
+    return gradient;
+  }
+
+  function hideLoading(id) {
+    const loading = document.getElementById(id);
+    if (loading) loading.style.display = 'none';
+  }
+
+  function showCanvas(id) {
+    const canvas = document.getElementById(id);
+    if (canvas) canvas.style.display = 'block';
+  }
+
+  function createHourlyChart(data) {
+    const canvas = document.getElementById('chart-hourly');
+    const ctx = canvas.getContext('2d');
+    hideLoading('hourly-loading');
+    showCanvas('chart-hourly');
+
+    charts.hourly = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.hourly.map(function (d) { return d.label; }),
+        datasets: [{
+          label: 'Requests',
+          data: data.hourly.map(function (d) { return d.count; }),
+          borderColor: '#3b82f6',
+          backgroundColor: makeGradient(ctx, 'rgba(59,130,246,0.35)', 'rgba(59,130,246,0)'),
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#3b82f6',
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: { duration: 750 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(15,23,42,0.05)' } },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(15,23,42,0.05)' },
+            ticks: { stepSize: 1 }
+          }
+        }
+      }
+    });
+  }
+
+  function createDailyChart(data) {
+    const ctx = document.getElementById('chart-daily').getContext('2d');
+    hideLoading('daily-loading');
+    showCanvas('chart-daily');
+
+    charts.daily = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.daily.map(function (d) { return d.label; }),
+        datasets: [{
+          label: 'Requests',
+          data: data.daily.map(function (d) { return d.count; }),
+          backgroundColor: 'rgba(34,197,94,0.6)',
+          borderColor: '#22c55e',
+          borderWidth: 1,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: { duration: 750 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(15,23,42,0.05)' }
+          }
+        }
+      }
+    });
+  }
+
+  function createAlertsChart(data) {
+    const canvas = document.getElementById('chart-alerts');
+    const ctx = canvas.getContext('2d');
+    hideLoading('alerts-loading');
+    showCanvas('chart-alerts');
+
+    charts.alerts = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.alerts_daily.map(function (d) { return d.label; }),
+        datasets: [{
+          label: 'Alerts',
+          data: data.alerts_daily.map(function (d) { return d.count; }),
+          borderColor: '#ef4444',
+          backgroundColor: makeGradient(ctx, 'rgba(239,68,68,0.35)', 'rgba(239,68,68,0)'),
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#ef4444',
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: { duration: 750 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(15,23,42,0.05)' } },
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1 },
+            grid: { color: 'rgba(15,23,42,0.05)' }
+          }
+        }
+      }
+    });
+  }
+
+  function createSeverityChart(data) {
+    const ctx = document.getElementById('chart-severity').getContext('2d');
+    const severity = data.alert_severity;
+
+    charts.severity = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{
+          data: [
+            severity.critical,
+            severity.high,
+            severity.medium,
+            severity.low,
+          ],
+          backgroundColor: [
+            'rgba(239,68,68,0.85)',
+            'rgba(249,115,22,0.85)',
+            'rgba(245,158,11,0.85)',
+            'rgba(6,182,212,0.85)',
+          ],
+          borderWidth: 0,
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        cutout: '70%',
+        animation: { duration: 750 },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  function updateLineChart(chart, labels, values) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update('none');
+  }
+
+  function updateBarChart(chart, labels, values) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update('none');
+  }
+
+  function updateSeverityUI(severity) {
+    const mapping = {
+      critical: document.getElementById('severity-count-critical'),
+      high: document.getElementById('severity-count-high'),
+      medium: document.getElementById('severity-count-medium'),
+      low: document.getElementById('severity-count-low'),
+    };
+
+    Object.keys(mapping).forEach(function (key) {
+      if (mapping[key]) mapping[key].textContent = severity[key];
+    });
+
+    if (charts.severity) {
+      charts.severity.data.datasets[0].data = [
+        severity.critical,
+        severity.high,
+        severity.medium,
+        severity.low,
+      ];
+      charts.severity.update('none');
+    }
+  }
+
+  function updateSummaryPills(data) {
+    const requestsPill = document.getElementById('analytics-total-requests');
+    const alertsPill = document.getElementById('analytics-total-alerts');
+
+    if (requestsPill) {
+      requestsPill.innerHTML = '<i class="bi bi-activity" style="color:var(--nw-accent);"></i> ' +
+        data.total_requests + ' Total Requests';
+    }
+    if (alertsPill) {
+      alertsPill.innerHTML = '<i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i> ' +
+        data.total_alerts + ' Total Alerts';
+    }
+  }
+
+  function renderTopIps(topIps) {
+    const container = document.getElementById('top-ips-container');
+    if (!container) return;
+
+    if (!topIps.length) {
+      container.innerHTML = '<div class="nw-empty-state"><i class="bi bi-inbox"></i><p>No traffic data yet.</p></div>';
+      return;
+    }
+
+    const maxCount = topIps[0].count;
+    container.innerHTML = topIps.map(function (ip) {
+      const width = maxCount ? Math.round((ip.count / maxCount) * 100) : 0;
+      return `<div style="margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="nw-ip">${ip.ip}</span>
+          <span style="font-size:12px; font-weight:700; color:var(--nw-text-primary);">
+            ${ip.count} <span style="color:var(--nw-text-muted); font-weight:400;">reqs</span>
+          </span>
+        </div>
+        <div class="rank-bar-bg">
+          <div class="rank-bar-fill red" style="width:${width}%;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function applyAnalyticsData(data, isInitial) {
+    if (isInitial) {
+      createHourlyChart(data);
+      createDailyChart(data);
+      createAlertsChart(data);
+      createSeverityChart(data);
+    } else {
+      if (charts.hourly) {
+        updateLineChart(
+          charts.hourly,
+          data.hourly.map(function (d) { return d.label; }),
+          data.hourly.map(function (d) { return d.count; })
+        );
+      }
+      if (charts.daily) {
+        updateBarChart(
+          charts.daily,
+          data.daily.map(function (d) { return d.label; }),
+          data.daily.map(function (d) { return d.count; })
+        );
+      }
+      if (charts.alerts) {
+        updateLineChart(
+          charts.alerts,
+          data.alerts_daily.map(function (d) { return d.label; }),
+          data.alerts_daily.map(function (d) { return d.count; })
+        );
+      }
+    }
+
+    updateSeverityUI(data.alert_severity);
+    updateSummaryPills(data);
+    renderTopIps(data.top_ips);
+  }
+
+  function refreshAnalytics(isInitial) {
+    return fetch(DATA_URL, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Analytics data request failed');
+        return response.json();
+      })
+      .then(function (data) {
+        applyAnalyticsData(data, isInitial);
+      })
+      .catch(function (err) {
+        console.error('Analytics refresh failed:', err);
+      });
+  }
+
+  refreshAnalytics(true).then(function () {
+    setInterval(function () {
+      refreshAnalytics(false);
+    }, ANALYTICS_POLL_MS);
+  });
+})();
+</script>
+{% endblock %}

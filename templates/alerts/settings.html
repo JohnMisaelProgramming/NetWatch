@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+
+{% block title %}System Settings{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block page_breadcrumb %}Configuration{% endblock %}
+
+{% block extra_css %}
+<style>
+  .health-indicator {
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status-dot-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot-pulse.active {
+    background-color: var(--nw-success);
+    box-shadow: 0 0 8px var(--nw-success);
+    animation: status-pulse-glow 1.5s infinite ease-in-out;
+  }
+  .status-dot-pulse.offline {
+    background-color: var(--nw-danger);
+    box-shadow: 0 0 8px var(--nw-danger);
+  }
+  @keyframes status-pulse-glow {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-4" style="font-size:13px; border-radius:10px;">
+    {{ message }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-4">
+  <!-- Left Column: Detection & Security Configuration -->
+  <div class="col-lg-6">
+    <div class="nw-card">
+      <h5 class="mb-4" style="color:var(--nw-text-primary); font-weight:700;">
+        <i class="bi bi-gear-fill me-1" style="color:var(--nw-accent);"></i>Global Configuration
+      </h5>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="update_settings" value="1">
+
+        <!-- System Maintenance Mode -->
+        <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">System Lockdown Options</h6>
+        <div class="form-check form-switch mb-4">
+          <input class="form-check-input" type="checkbox" name="enable_maintenance_mode" id="enable_maintenance_mode" {% if settings.enable_maintenance_mode %}checked{% endif %}
+            style="cursor:pointer; background-color:var(--nw-bg-page); border-color:var(--nw-border);">
+          <label class="form-check-label" for="enable_maintenance_mode" style="font-size:13px; font-weight:600; color:var(--nw-text-primary); cursor:pointer;">Enable Maintenance Mode</label>
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Blocks all Viewer users. Only Administrators and Security Analysts can bypass lockdown.</div>
+        </div>
+
+        <hr style="border-color:var(--nw-border); opacity:1; margin:22px 0;" />
+
+        <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">DDoS Detection Parameters</h6>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Request Threshold</label>
+          <input type="number" name="request_threshold" class="form-control" value="{{ settings.request_threshold }}" required min="1"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Requests per minute before triggering an alert.</div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Time Window (Minutes)</label>
+          <input type="number" name="time_window_minutes" class="form-control" value="{{ settings.time_window_minutes }}" required min="1"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Time window in minutes to evaluate request frequency.</div>
+        </div>
+
+        <hr style="border-color:var(--nw-border); opacity:1; margin:22px 0;" />
+
+        <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Rate-Limiting Limits</h6>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Rate Limit Threshold</label>
+          <input type="number" name="rate_limit_threshold" class="form-control" value="{{ settings.rate_limit_threshold }}" required min="1"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Maximum requests per window before logging a violation.</div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Rate Limit Window (Minutes)</label>
+          <input type="number" name="rate_limit_window_minutes" class="form-control" value="{{ settings.rate_limit_window_minutes }}" required min="1"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Time window used to measure request-rate violations.</div>
+        </div>
+
+        <hr style="border-color:var(--nw-border); opacity:1; margin:22px 0;" />
+
+        <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Dynamic Threat Severity Config</h6>
+
+        <!-- Traffic Spike Severity Thresholds -->
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">Medium Severity</label>
+            <input type="number" name="severity_medium_threshold" class="form-control" value="{{ settings.severity_medium_threshold }}" required min="1"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">High Severity</label>
+            <input type="number" name="severity_high_threshold" class="form-control" value="{{ settings.severity_high_threshold }}" required min="1"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">Critical Severity</label>
+            <input type="number" name="severity_critical_threshold" class="form-control" value="{{ settings.severity_critical_threshold }}" required min="1"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+          </div>
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted); margin-top:4px;">Request counts to trigger corresponding alert severity levels. Recommended defaults: 20, 50, 100.</div>
+        </div>
+
+        <!-- Rate Limit Severity Multipliers -->
+        <div class="row g-2 mb-4">
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">Rate Limit High Multiplier</label>
+            <input type="number" step="0.1" name="rate_limit_high_multiplier" class="form-control" value="{{ settings.rate_limit_high_multiplier }}" required min="1"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">Rate Limit Critical Multiplier</label>
+            <input type="number" step="0.1" name="rate_limit_critical_multiplier" class="form-control" value="{{ settings.rate_limit_critical_multiplier }}" required min="1"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+          </div>
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted); margin-top:4px;">Rate violation severity triggers (threshold multiplier). Recommended defaults: 2.0x, 4.0x.</div>
+        </div>
+
+        <hr style="border-color:var(--nw-border); opacity:1; margin:22px 0;" />
+
+        <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Automatic IP Blocking</h6>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" name="enable_auto_blocking" id="enable_auto_blocking" {% if settings.enable_auto_blocking %}checked{% endif %}
+            style="cursor:pointer; background-color:var(--nw-bg-page); border-color:var(--nw-border);">
+          <label class="form-check-label" for="enable_auto_blocking" style="font-size:13px; font-weight:600; color:var(--nw-text-muted); cursor:pointer;">Enable Auto IP Blocking</label>
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Automatically add offending IPs to the Blocklist if they exceed the auto-block threshold.</div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Auto-Block Threshold (Request Count)</label>
+          <input type="number" name="auto_block_threshold" class="form-control" value="{{ settings.auto_block_threshold }}" required min="1"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Requests within the time window above which the IP is automatically blocked. Recommended default: 100.</div>
+        </div>
+
+        <button type="submit" name="update_settings" value="1" class="btn btn-primary w-100" style="background:var(--nw-accent); border:none; padding:10px 20px; font-size:13px; font-weight:600;">
+          Save Security Parameters
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Column: System Diagnostics & Whitelist Controls -->
+  <div class="col-lg-6">
+    
+    <!-- System Health Diagnostics -->
+    <div class="nw-card mb-4">
+      <h5 class="mb-4" style="color:var(--nw-text-primary); font-weight:700;">
+        <i class="bi bi-heart-pulse-fill me-1" style="color:var(--nw-danger);"></i>System Health & Heartbeat
+      </h5>
+
+      <!-- Heartbeat check -->
+      <div class="d-flex align-items-center justify-content-between mb-4 p-3 border rounded" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+        <div>
+          <div style="font-weight:600; font-size:14px; color:var(--nw-text-primary);">Detection Daemon</div>
+          <div style="font-size:11px; color:var(--nw-text-muted); margin-top:2px;">Last pass recorded: {{ detector_last_run }}</div>
+        </div>
+        <div>
+          {% if detector_running %}
+            <span class="health-indicator bg-success-subtle text-success border border-success-subtle">
+              <span class="status-dot-pulse active"></span> Daemon Active
+            </span>
+          {% else %}
+            <span class="health-indicator bg-danger-subtle text-danger border border-danger-subtle">
+              <span class="status-dot-pulse offline"></span> Daemon Offline
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Specs row -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div class="p-2 border rounded text-center" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+            <div style="font-size:10px; color:var(--nw-text-muted);">HOST OS</div>
+            <div style="font-weight:700; color:var(--nw-text-primary); font-size:13px;" class="mt-1">{{ os_name }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="p-2 border rounded text-center" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+            <div style="font-size:10px; color:var(--nw-text-muted);">CPU CORES</div>
+            <div style="font-weight:700; color:var(--nw-text-primary); font-size:13px;" class="mt-1">{{ cpu_cores }} Core{{ cpu_cores|pluralize }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-2 mb-4">
+        <div class="col-6">
+          <div class="p-2 border rounded text-center" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+            <div style="font-size:10px; color:var(--nw-text-muted);">CPU UTILIZATION</div>
+            <div style="font-weight:700; color:var(--nw-text-primary); font-size:13px;" class="mt-1">{{ cpu_percent }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="p-2 border rounded text-center" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+            <div style="font-size:10px; color:var(--nw-text-muted);">RAM UTILIZATION</div>
+            <div style="font-weight:700; color:var(--nw-text-primary); font-size:13px;" class="mt-1">{{ ram_percent }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQLite DB Diagnostics -->
+      <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Database Core Diagnostics</h6>
+      <div class="d-flex justify-content-between mb-2 text-start" style="font-size:13px;">
+        <span class="text-muted">Database Engine:</span>
+        <span style="font-weight:600; color:var(--nw-text-primary);">{{ db_stats.db_engine }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2 text-start" style="font-size:13px;">
+        <span class="text-muted">Database File Size:</span>
+        <span style="font-weight:600; color:var(--nw-text-primary);">{{ db_stats.db_size }}</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:12px 0;"></div>
+      <div class="d-flex justify-content-between mb-2 text-start" style="font-size:13px;">
+        <span class="text-muted">Total Traffic Logs:</span>
+        <span style="font-weight:600; color:var(--nw-text-primary);">{{ db_stats.traffic_logs }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2 text-start" style="font-size:13px;">
+        <span class="text-muted">Total Alerts Generated:</span>
+        <span style="font-weight:600; color:var(--nw-text-primary);">{{ db_stats.alerts }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2 text-start" style="font-size:13px;">
+        <span class="text-muted">Blocked IPs:</span>
+        <span style="font-weight:600; color:var(--nw-danger);">{{ db_stats.blocked_ips }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-0 text-start" style="font-size:13px;">
+        <span class="text-muted">Whitelisted IPs:</span>
+        <span style="font-weight:600; color:var(--nw-success);">{{ db_stats.whitelisted_ips }}</span>
+      </div>
+    </div>
+
+    <!-- Whitelist Configuration -->
+    <div class="nw-card">
+      <h5 class="mb-3" style="color:var(--nw-text-primary); font-weight:700;">
+        <i class="bi bi-shield-check me-1" style="color:var(--nw-success);"></i>IP Whitelist (Safe Addresses)
+      </h5>
+      <p style="font-size:12px; color:var(--nw-text-muted); line-height:1.5; margin-bottom:15px;">
+        Whitelisted IP addresses bypass all blocking actions. This is useful to prevent locking out core routers, monitoring gateways, or diagnostic clients.
+      </p>
+
+      <!-- Add IP Form -->
+      <form method="post" action="{% url 'whitelist_add_ip' %}" class="row g-2 mb-4">
+        {% csrf_token %}
+        <div class="col-sm-5">
+          <input type="text" name="ip_address" class="form-control" placeholder="IP (e.g. 192.168.1.50)" required
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px; font-family:'Courier New', monospace;">
+        </div>
+        <div class="col-sm-5">
+          <input type="text" name="reason" class="form-control" placeholder="Reason (optional)"
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); font-size:12px;">
+        </div>
+        <div class="col-sm-2">
+          <button type="submit" class="btn btn-success w-100" style="font-size:12px; font-weight:600; padding:8px 0;">Add</button>
+        </div>
+      </form>
+
+      <!-- List of whitelisted IPs -->
+      <div style="overflow-x:auto; max-height: 200px; overflow-y: auto;">
+        <table class="table nw-table m-0" style="font-size:12px;">
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th>Reason</th>
+              <th style="width: 50px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in whitelisted_ips %}
+            <tr>
+              <td><span style="font-family:'Courier New', monospace; font-weight:700;">{{ item.ip_address }}</span></td>
+              <td class="text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.reason }}</td>
+              <td>
+                <form method="post" action="{% url 'whitelist_delete_ip' item.pk %}" onsubmit="return confirm('Remove IP {{ item.ip_address }} from whitelist?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:10px; padding:3px 6px;">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3" class="text-center text-muted py-3">No whitelisted IP addresses.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

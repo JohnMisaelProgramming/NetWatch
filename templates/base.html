@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<!--
+  base.html — Master Layout Template for NetWatch
+  ================================================
+  This is the foundation template that ALL other pages extend.
+  It defines:
+    - HTML head (meta, Bootstrap 5 CSS, Google Fonts, custom styles)
+    - Left sidebar navigation
+    - Top navigation bar
+    - Main content area (filled by child templates via block content tag)
+    - Bootstrap 5 JS at the bottom
+
+  Child templates use:
+    extends base.html
+    [block content] ... their unique content ... [endblock]
+-->
+<html lang="en">
+
+<head>
+  <!-- ── Character encoding and viewport (required for all HTML5 pages) ── -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ── SEO Meta Tags ─────────────────────────────────────────────────── -->
+  <meta name="description"
+    content="NetWatch — Web-Based Network Traffic Monitoring and DDoS Detection System" />
+  <meta name="author" content="NetWatch Security System" />
+
+  <!-- ── Dynamic Page Title ───────────────────────────────────────────── -->
+  <!-- Child templates can override the title using the block title tag -->
+  <title>{% block title %}NetWatch{% endblock %} | NetWatch Security</title>
+
+  <!-- ── Google Fonts: Inter ──────────────────────────────────────────── -->
+  <!-- Inter is a professional, highly-legible sans-serif used in Figma,
+       Linear, Notion, and most modern SaaS dashboards. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <!-- ── Bootstrap 5.3 CSS ────────────────────────────────────────────── -->
+  <!-- Bootstrap provides the grid system, utility classes, and components
+       (cards, badges, tables, buttons) we'll use throughout NetWatch. -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- ── Bootstrap Icons ──────────────────────────────────────────────── -->
+  <!-- Icon font library — used for sidebar icons and status indicators. -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+  <!-- ── NetWatch Custom Styles ───────────────────────────────────────── -->
+  <style>
+    /* ── Design System Tokens ───────────────────────────────────────── */
+    :root {
+      --nw-bg-page: #f8fafc;
+      /* Light grayish blue — primary background */
+      --nw-bg-sidebar: #ffffff;
+      /* White — sidebar background */
+      --nw-bg-card: #ffffff;
+      /* Card surfaces */
+      --nw-bg-card-hover: #f1f5f9;
+      /* Card on hover */
+      --nw-border: #e2e8f0;
+      /* Subtle borders */
+      --nw-text-primary: #0f172a;
+      /* Main text color */
+      --nw-text-muted: #64748b;
+      /* Secondary/muted text */
+      --nw-accent: #2563eb;
+      /* Primary blue accent (links, highlights) */
+      --nw-accent-glow: rgba(37, 99, 235, 0.08);
+      /* Blue glow for hover effects */
+      --nw-success: #16a34a;
+      /* Green — operational/good status */
+      --nw-warning: #d97706;
+      /* Amber — warning/medium status */
+      --nw-danger: #dc2626;
+      /* Red — critical/danger status */
+      --nw-info: #0891b2;
+      /* Cyan — informational */
+      --nw-orange: #ea580c;
+      /* Orange — high severity */
+      --nw-sidebar-width: 260px;
+      /* Fixed sidebar width */
+      --nw-topbar-height: 64px;
+      /* Fixed topbar height */
+      --nw-transition: 0.2s ease;
+      /* Standard transition speed */
+    }
+
+    /* ── Global Reset & Base Styles ──────────────────────────────────── */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--nw-bg-page);
+      color: var(--nw-text-primary);
+      min-height: 100vh;
+      display: flex;
+      /* Enables sidebar + main content side-by-side layout */
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────── */
+    .nw-sidebar {
+      width: var(--nw-sidebar-width);
+      background: var(--nw-bg-sidebar);
+      border-right: 1px solid var(--nw-border);
+      display: flex;
+      flex-direction: column;
+      /* Stack logo, nav items, and footer vertically */
+      position: fixed;
+      /* Stay fixed while page content scrolls */
+      top: 0;
+      left: 0;
+      height: 100vh;
+      /* Full viewport height */
+      z-index: 1000;
+      /* Above page content */
+      overflow-y: auto;
+      /* Allow scrolling if nav items exceed screen height */
+    }
+
+    /* ── Sidebar Logo/Brand ───────────────────────────────────────────── */
+    .nw-sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--nw-border);
+      text-decoration: none;
+    }
+
+    .nw-brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--nw-accent), #6366f1);
+      /* Blue-to-indigo gradient icon background */
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px var(--nw-accent-glow);
+    }
+
+    .nw-brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nw-brand-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--nw-text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .nw-brand-subtitle {
+      font-size: 11px;
+      color: var(--nw-text-muted);
+      font-weight: 400;
+    }
+
+    /* ── Sidebar Navigation ───────────────────────────────────────────── */
+    .nw-nav {
+      flex: 1;
+      /* Takes remaining vertical space */
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nw-nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--nw-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      padding: 12px 12px 6px;
+      /* Adds visual grouping labels like "MONITORING", "SYSTEM" */
+    }
+
+    /* ── Individual Navigation Item ──────────────────────────────────── */
+    .nw-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      /* Rounded pill shape */
+      color: var(--nw-text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      transition: all var(--nw-transition);
+      /* Smooth hover animation */
+      position: relative;
+    }
+
+    .nw-nav-item:hover {
+      background: var(--nw-bg-card);
+      color: var(--nw-text-primary);
+    }
+
+    /* Active nav item — highlights the current page */
+    .nw-nav-item.active {
+      background: var(--nw-accent-glow);
+      color: var(--nw-accent);
+      /* Blue text for active item */
+    }
+
+    /* Left border indicator on active item (similar to VS Code sidebar) */
+    .nw-nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 20px;
+      background: var(--nw-accent);
+      border-radius: 0 3px 3px 0;
+    }
+
+    .nw-nav-item i {
+      font-size: 16px;
+      width: 20px;
+      /* Fixed width ensures icon text aligns consistently */
+      text-align: center;
+    }
+
+    /* Badge on nav items — e.g., alert count in sidebar */
+    .nw-nav-badge {
+      margin-left: auto;
+      /* Push to the right side */
+      background: var(--nw-danger);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    /* ── Sidebar Footer ───────────────────────────────────────────────── */
+    .nw-sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid var(--nw-border);
+    }
+
+    .nw-user-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--nw-bg-page);
+    }
+
+    .nw-avatar {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #6366f1, var(--nw-accent));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .nw-user-info {
+      flex: 1;
+      min-width: 0;
+      /* Prevents text overflow from expanding the container */
+    }
+
+    .nw-username {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--nw-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* Truncate long usernames with "..." */
+    }
+
+    .nw-user-role {
+      font-size: 11px;
+      color: var(--nw-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Main Content Area ────────────────────────────────────────────── */
+    .nw-main {
+      margin-left: var(--nw-sidebar-width);
+      /* Offset by sidebar width */
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Top Navigation Bar ───────────────────────────────────────────── */
+    .nw-topbar {
+      height: var(--nw-topbar-height);
+      background: var(--nw-bg-sidebar);
+      border-bottom: 1px solid var(--nw-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      /* Sticks to the top when scrolling */
+      top: 0;
+      z-index: 999;
+      backdrop-filter: blur(12px);
+      /* Frosted glass effect when content scrolls behind it */
+    }
+
+    .nw-page-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--nw-text-primary);
+    }
+
+    .nw-page-breadcrumb {
+      font-size: 12px;
+      color: var(--nw-text-muted);
+      margin-top: 1px;
+    }
+
+    .nw-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* ── Content Wrapper ──────────────────────────────────────────────── */
+    .nw-content {
+      padding: 28px;
+      flex: 1;
+    }
+
+    /* ── KPI Cards ────────────────────────────────────────────────────── */
+    .nw-card {
+      background: var(--nw-bg-card);
+      border: 1px solid var(--nw-border);
+      border-radius: 14px;
+      padding: 22px;
+      transition: all var(--nw-transition);
+      /* Smooth hover lift effect */
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nw-card:hover {
+      background: var(--nw-bg-card-hover);
+      transform: translateY(-2px);
+      /* Subtle lift on hover */
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Glowing top-border accent line on KPI cards */
+    .nw-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--nw-accent), transparent);
+      opacity: 0;
+      transition: opacity var(--nw-transition);
+    }
+
+    .nw-card:hover::before {
+      opacity: 1;
+      /* Show the glowing line on hover */
+    }
+
+    .nw-kpi-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .nw-kpi-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--nw-text-primary);
+      line-height: 1;
+      margin-bottom: 6px;
+      letter-spacing: -1px;
+      /* Tight tracking makes large numbers look premium */
+    }
+
+    .nw-kpi-label {
+      font-size: 12.5px;
+      color: var(--nw-text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Section Headers ──────────────────────────────────────────────── */
+    .nw-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .nw-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--nw-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nw-section-title::before {
+      content: '';
+      width: 3px;
+      height: 16px;
+      background: var(--nw-accent);
+      border-radius: 2px;
+      /* Blue left-border accent next to section titles */
+    }
+
+    /* ── Data Tables ──────────────────────────────────────────────────── */
+    .nw-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .nw-table thead th {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--nw-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--nw-border);
+      white-space: nowrap;
+    }
+
+    .nw-table tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--nw-border);
+      font-size: 13px;
+      color: var(--nw-text-primary);
+      vertical-align: middle;
+    }
+
+    .nw-table tbody tr:last-child td {
+      border-bottom: none;
+      /* Remove bottom border from last row */
+    }
+
+    .nw-table tbody tr:hover td {
+      background: var(--nw-bg-card-hover);
+      /* Row highlight on hover */
+    }
+
+    /* ── Badges ───────────────────────────────────────────────────────── */
+    .nw-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .nw-badge-success {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--nw-success);
+    }
+
+    .nw-badge-warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--nw-warning);
+    }
+
+    .nw-badge-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--nw-danger);
+    }
+
+    .nw-badge-info {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--nw-info);
+    }
+
+    .nw-badge-orange {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--nw-orange);
+    }
+
+    .nw-badge-secondary {
+      background: rgba(107, 122, 153, 0.15);
+      color: var(--nw-text-muted);
+    }
+
+    /* ── Status Dot ───────────────────────────────────────────────────── */
+    /* Pulsing animated dot for "live" status indicators */
+    .nw-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .nw-status-dot.success {
+      background: var(--nw-success);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+      animation: nw-pulse-green 2s infinite;
+    }
+
+    .nw-status-dot.warning {
+      background: var(--nw-warning);
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+      animation: nw-pulse-yellow 2s infinite;
+    }
+
+    @keyframes nw-pulse-green {
+      0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+      }
+    }
+
+    @keyframes nw-pulse-yellow {
+      0% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+      }
+    }
+
+    /* ── Method Labels (GET/POST) ─────────────────────────────────────── */
+    .nw-method {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .nw-method-get {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--nw-success);
+    }
+
+    .nw-method-post {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--nw-accent);
+    }
+
+    .nw-method-other {
+      background: rgba(107, 122, 153, 0.15);
+      color: var(--nw-text-muted);
+    }
+
+    /* ── IP Address Text ──────────────────────────────────────────────── */
+    .nw-ip {
+      font-family: 'Courier New', monospace;
+      font-size: 12.5px;
+      color: var(--nw-info);
+    }
+
+    /* ── URL Text ─────────────────────────────────────────────────────── */
+    .nw-url {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--nw-text-muted);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    /* ── Timestamp text ───────────────────────────────────────────────── */
+    .nw-timestamp {
+      font-size: 12px;
+      color: var(--nw-text-muted);
+      white-space: nowrap;
+    }
+
+    /* ── Empty State ──────────────────────────────────────────────────── */
+    .nw-empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--nw-text-muted);
+    }
+
+    .nw-empty-state i {
+      font-size: 36px;
+      margin-bottom: 12px;
+      display: block;
+      opacity: 0.4;
+    }
+
+    /* ── Logout Button ────────────────────────────────────────────────── */
+    .nw-logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: none;
+      border: none;
+      color: var(--nw-text-muted);
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all var(--nw-transition);
+      width: 100%;
+    }
+
+    .nw-logout-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--nw-danger);
+    }
+
+    /* ── KPI Icon Color Variants ──────────────────────────────────────── */
+    .icon-blue {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--nw-accent);
+    }
+
+    .icon-green {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--nw-success);
+    }
+
+    .icon-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--nw-info);
+    }
+
+    .icon-red {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--nw-danger);
+    }
+
+    /* ── Responsive: Hide sidebar on small screens ────────────────────── */
+    @media (max-width: 768px) {
+      .nw-sidebar {
+        display: none;
+      }
+
+      .nw-main {
+        margin-left: 0;
+      }
+    }
+  </style>
+
+  <!-- ── Extra CSS block for child templates to inject page-specific styles ── -->
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!--  LEFT SIDEBAR                                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <aside class="nw-sidebar">
+
+    <!-- Brand / Logo -->
+    <a href="{% url 'dashboard' %}" class="nw-sidebar-brand">
+      <div class="nw-brand-icon">
+        <i class="bi bi-shield-fill-check"></i>
+        <!-- Shield icon — represents security/protection -->
+      </div>
+      <div class="nw-brand-text">
+        <span class="nw-brand-name">NetWatch</span>
+        <span class="nw-brand-subtitle">Security Monitor</span>
+      </div>
+    </a>
+
+    <!-- Navigation Links -->
+    <nav class="nw-nav">
+
+      <span class="nw-nav-section-label">Monitoring</span>
+
+      <!-- Dashboard link — active class is set by child templates -->
+      <a href="{% url 'dashboard' %}"
+        class="nw-nav-item {% block nav_dashboard %}{% endblock %}">
+        <i class="bi bi-grid-fill"></i>
+        Dashboard
+      </a>
+
+      {% if is_admin_user or is_analyst_user %}
+      <!-- Alerts link — now points to the real alerts management page -->
+      <a href="{% url 'alerts_list' %}" class="nw-nav-item {% block nav_alerts %}{% endblock %}">
+        <i class="bi bi-bell-fill"></i>
+        Alerts
+        {% if active_alerts %}
+        <span class="nw-nav-badge">{{ active_alerts }}</span>
+        {% endif %}
+      </a>
+
+      <a href="{% url 'ip_investigation' %}" class="nw-nav-item {% block nav_investigate %}{% endblock %}">
+        <i class="bi bi-search"></i>
+        Investigation Center
+      </a>
+      {% endif %}
+
+      {% if is_admin_user or is_analyst_user %}
+      <span class="nw-nav-section-label">Analytics</span>
+
+      <a href="{% url 'analytics' %}" class="nw-nav-item {% block nav_traffic %}{% endblock %}">
+        <i class="bi bi-graph-up-arrow"></i>
+        Traffic Analysis
+      </a>
+
+      <a href="{% url 'rate_limit_history' %}" class="nw-nav-item {% block nav_rate_limits %}{% endblock %}">
+        <i class="bi bi-speedometer2"></i>
+        Rate Limit History
+      </a>
+
+      <a href="{% url 'reports' %}" class="nw-nav-item {% block nav_reports %}{% endblock %}">
+        <i class="bi bi-file-earmark-bar-graph-fill"></i>
+        Reports
+      </a>
+      {% endif %}
+
+      <span class="nw-nav-section-label">System</span>
+
+      {% if is_admin_user %}
+      <a href="{% url 'settings' %}" class="nw-nav-item {% block nav_settings %}{% endblock %}">
+        <i class="bi bi-sliders"></i>
+        Settings & Config
+      </a>
+
+      <a href="{% url 'blocklist' %}" class="nw-nav-item {% block nav_blocklist %}{% endblock %}">
+        <i class="bi bi-shield-lock-fill"></i>
+        IP Blocklist
+      </a>
+
+      <a href="{% url 'simulation_lab' %}" class="nw-nav-item {% block nav_simulation %}{% endblock %}">
+        <i class="bi bi-play-circle-fill"></i>
+        Security Validation Lab
+      </a>
+
+      <a href="/admin/" class="nw-nav-item" target="_blank">
+        <i class="bi bi-gear-fill"></i>
+        Django Admin
+        <i class="bi bi-box-arrow-up-right ms-auto"
+          style="font-size:10px; opacity:0.5;"></i>
+      </a>
+      {% endif %}
+
+    </nav>
+
+    <!-- Sidebar Footer: User Info + Logout -->
+    <div class="nw-sidebar-footer">
+      <!-- User Info Card -->
+      <div class="nw-user-card mb-2">
+        <!-- Avatar: Shows the first letter of the username -->
+        <div class="nw-avatar">
+          {{ request.user.username|first|upper }}
+        </div>
+        <div class="nw-user-info">
+          <div class="nw-username">{{ request.user.username }}</div>
+          <div class="nw-user-role">
+            {{ user_role|default:"User"|title }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Logout Button -->
+      <form action="{% url 'logout' %}" method="post">
+        {% csrf_token %}
+        <button type="submit" class="nw-logout-btn">
+          <i class="bi bi-box-arrow-left"></i>
+          Sign Out
+        </button>
+      </form>
+
+    </div>
+  </aside>
+  <!-- END SIDEBAR -->
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!--  MAIN CONTENT AREA                                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div class="nw-main">
+
+    <!-- Top Bar -->
+    <header class="nw-topbar">
+      <div>
+        <!-- Page title — child templates override this block -->
+        <div class="nw-page-title">{% block page_title %}Dashboard{% endblock %}</div>
+        <div class="nw-page-breadcrumb">
+          NetWatch / {% block page_breadcrumb %}Overview{% endblock %}
+        </div>
+      </div>
+
+      <!-- Top Bar Right Actions -->
+      <div class="nw-topbar-actions">
+        <!-- System Clock (updated by JavaScript below) -->
+        <span id="nw-system-clock"
+          style="font-size:12px; color:var(--nw-text-muted); font-family:'Courier New',monospace;">
+        </span>
+
+        {% if is_admin_user or is_analyst_user %}
+        <!-- Notification Bell — links to alert management page -->
+        <a href="{% url 'alerts_list' %}" class="btn btn-sm"
+          style="background:var(--nw-bg-card); border:1px solid var(--nw-border); color:var(--nw-text-primary); border-radius:8px; position:relative; text-decoration:none;"
+          title="View Active Alerts">
+          <i class="bi bi-bell-fill"></i>
+          {% if active_alerts %}
+          <span
+            style="position:absolute; top:-4px; right:-4px; width:16px; height:16px; background:var(--nw-danger); border-radius:50%; font-size:9px; font-weight:700; display:flex; align-items:center; justify-content:center; color:white;">
+            {{ active_alerts }}
+          </span>
+          {% endif %}
+        </a>
+        {% endif %}
+
+        <!-- Logged-in User Label -->
+        <div
+          style="display:flex; align-items:center; gap:8px; background:var(--nw-bg-card); border:1px solid var(--nw-border); border-radius:8px; padding:6px 12px;">
+          <div class="nw-avatar" style="width:26px; height:26px; font-size:11px;">
+            {{ request.user.username|first|upper }}
+          </div>
+          <span style="font-size:13px; font-weight:500; color:var(--nw-text-primary);">
+            {{ request.user.username }}
+          </span>
+        </div>
+      </div>
+    </header>
+    <!-- END TOPBAR -->
+
+    <!-- ── Page Content (Filled by child templates) ────────────────── -->
+    <main class="nw-content">
+      {% block content %}{% endblock %}
+    </main>
+    <!-- END CONTENT -->
+
+    <!-- Footer -->
+    <footer
+      style="padding: 16px 28px; border-top:1px solid var(--nw-border); display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:12px; color:var(--nw-text-muted);">
+        &copy; 2025 NetWatch Security System — Final Project
+      </span>
+      <span style="font-size:12px; color:var(--nw-text-muted);">
+        Django 6 &bull; SQLite &bull; Bootstrap 5
+      </span>
+    </footer>
+
+  </div>
+  <!-- END MAIN -->
+
+  <!-- ── Bootstrap 5 JS Bundle ─────────────────────────────────────── -->
+  <!-- Placed at the bottom of <body> so it loads after the HTML is parsed.
+       'bundle' includes Popper.js — needed for dropdowns, tooltips, etc. -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- ── System Clock Script ────────────────────────────────────────── -->
+  <script>
+    // Updates the topbar clock every second
+    // Displays the current system time in a standard format familiar to IT professionals.
+    function updateClock() {
+      const now = new Date();
+      // Format: YYYY-MM-DD HH:MM:SS (ISO-inspired, familiar to IT professionals)
+      const formatted = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0') + '  ' +
+        String(now.getHours()).padStart(2, '0') + ':' +
+        String(now.getMinutes()).padStart(2, '0') + ':' +
+        String(now.getSeconds()).padStart(2, '0');
+      const el = document.getElementById('nw-system-clock');
+      if (el) el.textContent = formatted;
+    }
+    updateClock();                      // Run immediately on page load
+    setInterval(updateClock, 1000);     // Then update every 1000ms (1 second)
+  </script>
+
+  <!-- ── Extra JS block for child templates ────────────────────────── -->
+  {% block extra_js %}{% endblock %}
+
+</body>
+
+</html>

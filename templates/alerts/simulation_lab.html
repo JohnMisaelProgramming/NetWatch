@@ -1,0 +1,453 @@
+{% extends 'base.html' %}
+
+{% block title %}Security Validation Lab{% endblock %}
+{% block nav_simulation %}active{% endblock %}
+{% block page_title %}Security Validation Lab{% endblock %}
+{% block page_breadcrumb %}Threat Simulation{% endblock %}
+
+{% block content %}
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-2 col-sm-4">
+    <div class="nw-card text-center" style="padding:15px;">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Total Runs</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-text-primary);" id="kpi-total">{{ total_sims }}</div>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="nw-card text-center" style="padding:15px; border-left: 3px solid var(--nw-success);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Completed</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-success);" id="kpi-completed">{{ completed_sims }}</div>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="nw-card text-center" style="padding:15px; border-left: 3px solid var(--nw-warning);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Stopped</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-warning);" id="kpi-stopped">{{ stopped_sims }}</div>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="nw-card text-center" style="padding:15px; border-left: 3px solid var(--nw-danger);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Failed</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-danger);" id="kpi-failed">{{ failed_sims }}</div>
+    </div>
+  </div>
+  <div class="col-md-4 col-sm-8">
+    <div class="nw-card text-center" style="padding:15px; background:linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06));">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Active Simulations</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-accent);" id="kpi-active">{{ active_sims }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Side: Simulator Setup -->
+  <div class="col-lg-6">
+    <div class="nw-card" style="height: 100%;">
+      <h5 class="mb-4" style="color:var(--nw-text-primary); font-weight:700;">
+        <i class="bi bi-play-circle-fill me-2" style="color:var(--nw-accent);"></i>Configure Traffic Generator
+      </h5>
+
+      {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}" style="font-size:13px;">
+          {{ message }}
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" action="{% url 'start_simulation' %}">
+        {% csrf_token %}
+        
+        <!-- Preset Selector -->
+        <div class="mb-3">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Select Simulation Profile</label>
+          <select id="preset-selector" class="form-select" style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+            <option value="normal" selected>Normal User Browsing</option>
+            <option value="spike">Traffic Spike (DDoS Prep)</option>
+            <option value="rate_limit">Rate-Limit Abuse (Brute Force Simulation)</option>
+            <option value="ddos">DDoS Distributed Attack Simulation</option>
+            <option value="custom">Custom Configuration...</option>
+          </select>
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Presets configure values automatically to match specific threat profiles.</div>
+        </div>
+
+        <input type="hidden" name="attack_type" id="attack-type-input" value="normal">
+
+        <!-- Target Endpoint -->
+        <div class="mb-3">
+          <label class="form-label" style="font-size:13px; font-weight:600; color:var(--nw-text-muted);">Target Endpoint (ShopSafe Port 8080)</label>
+          <input type="text" name="target_endpoint" id="target-endpoint" class="form-control" value="/" required
+            style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">The path to target on the ShopSafe server (must start with /). Try <code>/products/</code> or <code>/login/</code>.</div>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <!-- Requests Count -->
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:12px; font-weight:600; color:var(--nw-text-muted);">Requests Count</label>
+            <input type="number" name="num_requests" id="num-requests" class="form-control" value="100" required min="1" max="5000"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          </div>
+          <!-- Request Delay -->
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:12px; font-weight:600; color:var(--nw-text-muted);">Request Delay (ms)</label>
+            <input type="number" name="delay_ms" id="delay-ms" class="form-control" value="200" required min="0" max="5000"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          </div>
+          <!-- Simulated IPs -->
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:12px; font-weight:600; color:var(--nw-text-muted);">Simulated IPs Pool</label>
+            <input type="number" name="simulated_ips_count" id="ips-count" class="form-control" value="1" required min="1" max="100"
+              style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary);">
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <button type="submit" class="btn btn-primary w-100" style="background:var(--nw-accent); border:none; padding:10px; font-size:14px; font-weight:600;" id="btn-start">
+            <i class="bi bi-lightning-charge-fill me-1"></i>Launch Simulation
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Side: Active / Running Status -->
+  <div class="col-lg-6">
+    <div class="nw-card" style="height: 100%; display: flex; flex-direction: column;">
+      <h5 class="mb-4" style="color:var(--nw-text-primary); font-weight:700;">
+        <i class="bi bi-activity me-2" style="color:var(--nw-info);"></i>Active Telemetry State
+      </h5>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;" id="simulation-active-container">
+        <!-- Renders dynamically via JS or falls back to backend state -->
+        {% if active_sims > 0 %}
+          {% for run in simulations %}
+            {% if run.status == 'running' %}
+            <div class="w-100 p-3" id="active-card-{{ run.id }}" style="background:var(--nw-bg-page); border:1px solid var(--nw-border); border-radius:10px;">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">
+                  Simulation #{{ run.id }} <span class="badge bg-primary ms-1" style="font-size:10px;">{{ run.get_attack_type_display }}</span>
+                </span>
+                <span class="spinner-grow text-primary spinner-grow-sm" role="status"></span>
+              </div>
+              
+              <div class="progress mb-3" style="height: 18px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                     id="progress-bar-{{ run.id }}" role="progressbar" style="width: 0%; font-size:11px; font-weight:700; line-height:18px;">0%</div>
+              </div>
+
+              <div class="row text-center mb-3">
+                <div class="col-6">
+                  <div style="font-size:11px; color:var(--nw-text-muted);">SUCCESS SENT</div>
+                  <div style="font-size:18px; font-weight:700; color:var(--nw-success);" id="sent-count-{{ run.id }}">0</div>
+                </div>
+                <div class="col-6">
+                  <div style="font-size:11px; color:var(--nw-text-muted);">MITIGATED (403)</div>
+                  <div style="font-size:18px; font-weight:700; color:var(--nw-danger);" id="blocked-count-{{ run.id }}">0</div>
+                </div>
+              </div>
+
+              <form method="post" action="{% url 'stop_simulation' run.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm w-100" style="font-weight:600;">
+                  <i class="bi bi-stop-circle-fill me-1"></i>Stop Request Loop
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-5" id="simulation-empty-state">
+            <i class="bi bi-shield-slash" style="font-size:48px; color:var(--nw-border); margin-bottom:15px; display:block;"></i>
+            <p style="font-size:14px; color:var(--nw-text-muted); margin:0;">No traffic simulations currently running.</p>
+            <p style="font-size:11px; color:var(--nw-text-muted);">Configure parameters and launch a profile on the left.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Log Section -->
+<div class="nw-card mt-4" style="padding: 0; overflow:hidden;">
+  <div class="nw-section-header" style="padding:18px 20px 0;">
+    <div class="nw-section-title">
+      <i class="bi bi-list-columns-reverse" style="color:var(--nw-accent);"></i>
+      Traffic Simulation Logs
+    </div>
+    <span class="nw-badge nw-badge-info">Audit Trail</span>
+  </div>
+  <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Started At</th>
+          <th>Profile Type</th>
+          <th>Endpoint Target</th>
+          <th>Simulated IPs</th>
+          <th>Configuration</th>
+          <th>Mitigation Ratio (403 / Total)</th>
+          <th>Telemetry Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in simulations %}
+        <tr>
+          <td><span style="font-weight:600; color:var(--nw-text-muted);">#{{ run.id }}</span></td>
+          <td><span class="nw-timestamp">{{ run.started_at|date:"H:i:s d M Y" }}</span></td>
+          <td>
+            {% if run.attack_type == 'normal' %}
+              <span class="badge bg-success" style="font-size:11px;">Normal</span>
+            {% elif run.attack_type == 'spike' %}
+              <span class="badge bg-warning text-dark" style="font-size:11px;">Traffic Spike</span>
+            {% elif run.attack_type == 'rate_limit' %}
+              <span class="badge bg-orange" style="font-size:11px;">Rate Violation</span>
+            {% elif run.attack_type == 'ddos' %}
+              <span class="badge bg-danger" style="font-size:11px;">DDoS Attack</span>
+            {% else %}
+              <span class="badge bg-secondary" style="font-size:11px;">{{ run.attack_type }}</span>
+            {% endif %}
+          </td>
+          <td><code style="color:var(--nw-accent); font-weight:600;">{{ run.target_endpoint }}</code></td>
+          <td><span class="nw-ip">{{ run.simulated_ips_count }} IP{{ run.simulated_ips_count|pluralize }}</span></td>
+          <td>
+            <div style="font-size:11px; color:var(--nw-text-muted);">
+              Total Reqs: {{ run.num_requests }} | Delay: {{ run.delay_ms }}ms
+            </div>
+          </td>
+          <td>
+            <span style="font-weight:600;" class="{% if run.requests_blocked > 0 %}text-danger{% else %}text-muted{% endif %}">
+              {{ run.requests_blocked }}
+            </span> 
+            / {{ run.num_requests }}
+            {% if run.requests_sent or run.requests_blocked %}
+              <small class="ms-1 text-muted" style="font-size:10px;">
+                ({{ run.requests_blocked|add:run.requests_sent|default:1 }} processed)
+              </small>
+            {% endif %}
+          </td>
+          <td>
+            {% if run.status == 'completed' %}
+              <span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>
+            {% elif run.status == 'running' %}
+              <span class="nw-badge nw-badge-info"><i class="spinner-border spinner-border-sm me-1" style="width:10px; height:10px;"></i>Running</span>
+            {% elif run.status == 'stopped' %}
+              <span class="nw-badge nw-badge-warning"><i class="bi bi-slash-circle-fill me-1"></i>Stopped</span>
+            {% elif run.status == 'failed' %}
+              <span class="nw-badge nw-badge-danger" title="{{ run.error_message }}"><i class="bi bi-x-circle-fill me-1"></i>Failed</span>
+            {% else %}
+              <span class="nw-badge nw-badge-secondary">{{ run.status|capfirst }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8">
+            <div class="nw-empty-state" style="padding: 40px 0;">
+              <i class="bi bi-folder-symlink" style="font-size:24px; color:var(--nw-border); margin-bottom:8px; display:block;"></i>
+              <p style="margin:0; font-size:13px; color:var(--nw-text-muted);">No simulation audit records found.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Inline JavaScript Controls -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const presetSelector = document.getElementById("preset-selector");
+  const attackTypeInput = document.getElementById("attack-type-input");
+  const targetEndpoint = document.getElementById("target-endpoint");
+  const numRequests = document.getElementById("num-requests");
+  const delayMs = document.getElementById("delay-ms");
+  const ipsCount = document.getElementById("ips-count");
+
+  // Config preset mappings
+  const presets = {
+    normal: {
+      type: "normal",
+      endpoint: "/",
+      requests: 100,
+      delay: 200,
+      ips: 1
+    },
+    spike: {
+      type: "spike",
+      endpoint: "/",
+      requests: 200,
+      delay: 10,
+      ips: 1
+    },
+    rate_limit: {
+      type: "rate_limit",
+      endpoint: "/dashboard/",
+      requests: 60,
+      delay: 5,
+      ips: 1
+    },
+    ddos: {
+      type: "ddos",
+      endpoint: "/",
+      requests: 500,
+      delay: 0,
+      ips: 15
+    }
+  };
+
+  // Listen for preset dropdown change
+  presetSelector.addEventListener("change", function() {
+    const val = presetSelector.value;
+    if (val !== "custom" && presets[val]) {
+      const p = presets[val];
+      attackTypeInput.value = p.type;
+      targetEndpoint.value = p.endpoint;
+      numRequests.value = p.requests;
+      delayMs.value = p.delay;
+      ipsCount.value = p.ips;
+
+      // Lock configuration fields for presets
+      targetEndpoint.readOnly = true;
+      numRequests.readOnly = true;
+      delayMs.readOnly = true;
+      ipsCount.readOnly = true;
+    } else {
+      attackTypeInput.value = "custom";
+      // Unlock fields for customization
+      targetEndpoint.readOnly = false;
+      numRequests.readOnly = false;
+      delayMs.readOnly = false;
+      ipsCount.readOnly = false;
+    }
+  });
+
+  // Initial trigger to lock fields for 'normal' preset
+  presetSelector.dispatchEvent(new Event("change"));
+
+  // ── Polling Loop for Running Simulations ────────────────────────────
+  let activeInterval = null;
+
+  function startPolling() {
+    if (activeInterval) return;
+    activeInterval = setInterval(fetchSimulationStatus, 1000);
+  }
+
+  function stopPolling() {
+    if (activeInterval) {
+      clearInterval(activeInterval);
+      activeInterval = null;
+    }
+  }
+
+  function fetchSimulationStatus() {
+    fetch("{% url 'simulation_status_api' %}")
+      .then(response => response.json())
+      .then(data => {
+        const activeRuns = data.active_simulations;
+        
+        if (activeRuns.length === 0) {
+          // If no running simulation, stop polling and reload if we were previously running
+          stopPolling();
+          // Reload page to refresh the audit log and reset the container to empty state
+          // but check if container had active simulations before reloading
+          const activeContainer = document.getElementById("simulation-active-container");
+          if (activeContainer.querySelector(".progress")) {
+            window.location.reload();
+          }
+          return;
+        }
+
+        const activeContainer = document.getElementById("simulation-active-container");
+        const emptyState = document.getElementById("simulation-empty-state");
+        if (emptyState) emptyState.remove();
+
+        activeRuns.forEach(run => {
+          let card = document.getElementById(`active-card-${run.id}`);
+          
+          if (!card) {
+            // Build the card HTML dynamically if not present on page
+            const cardHtml = `
+              <div class="w-100 p-3" id="active-card-${run.id}" style="background:var(--nw-bg-page); border:1px solid var(--nw-border); border-radius:10px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">
+                    Simulation #${run.id} <span class="badge bg-primary ms-1" style="font-size:10px;">${run.attack_label}</span>
+                  </span>
+                  <span class="spinner-grow text-primary spinner-grow-sm" role="status"></span>
+                </div>
+                
+                <div class="progress mb-3" style="height: 18px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+                  <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                       id="progress-bar-${run.id}" role="progressbar" style="width: 0%; font-size:11px; font-weight:700; line-height:18px;">0%</div>
+                </div>
+
+                <div class="row text-center mb-3">
+                  <div class="col-6">
+                    <div style="font-size:11px; color:var(--nw-text-muted);">SUCCESS SENT</div>
+                    <div style="font-size:18px; font-weight:700; color:var(--nw-success);" id="sent-count-${run.id}">0</div>
+                  </div>
+                  <div class="col-6">
+                    <div style="font-size:11px; color:var(--nw-text-muted);">MITIGATED (403)</div>
+                    <div style="font-size:18px; font-weight:700; color:var(--nw-danger);" id="blocked-count-${run.id}">0</div>
+                  </div>
+                </div>
+
+                <form method="post" action="/alerts/simulation/stop/${run.id}/">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="${getCookie('csrftoken')}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm w-100" style="font-weight:600;">
+                    <i class="bi bi-stop-circle-fill me-1"></i>Stop Request Loop
+                  </button>
+                </form>
+              </div>
+            `;
+            activeContainer.innerHTML = cardHtml;
+            card = document.getElementById(`active-card-${run.id}`);
+          }
+
+          // Update active card stats
+          const progressBar = document.getElementById(`progress-bar-${run.id}`);
+          const sentCount = document.getElementById(`sent-count-${run.id}`);
+          const blockedCount = document.getElementById(`blocked-count-${run.id}`);
+
+          if (progressBar) {
+            progressBar.style.width = `${run.progress_pct}%`;
+            progressBar.textContent = `${run.progress_pct}%`;
+          }
+          if (sentCount) sentCount.textContent = run.requests_sent;
+          if (blockedCount) blockedCount.textContent = run.requests_blocked;
+        });
+      })
+      .catch(err => {
+        console.error("Error polling simulation status: ", err);
+      });
+  }
+
+  // Get CSRF cookie helper for stops triggered dynamically
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Start polling immediately if page has active indicator or on load
+  const hasRunning = parseInt("{{ active_sims|default:0 }}", 10) > 0;
+  if (hasRunning) {
+    startPolling();
+  }
+});
+</script>
+{% endblock %}

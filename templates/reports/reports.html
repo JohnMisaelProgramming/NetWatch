@@ -1,0 +1,769 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports & Audit{% endblock %}
+{% block nav_reports %}active{% endblock %}
+{% block page_title %}Reports & Audit{% endblock %}
+{% block page_breadcrumb %}Documentation & Export{% endblock %}
+
+{% block extra_css %}
+<style>
+  .report-filter-bar {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--nw-text-muted); text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .filter-input {
+    background: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-primary);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .filter-input:focus { border-color: var(--nw-accent); }
+  .filter-btn {
+    padding: 9px 18px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .btn-primary-nw { background: var(--nw-accent); color: white; }
+  .btn-primary-nw:hover { background: #2563eb; color: white; }
+  .btn-ghost-nw { background: var(--nw-bg-page); border: 1px solid var(--nw-border);
+    color: var(--nw-text-muted); }
+  .btn-ghost-nw:hover { color: var(--nw-text-primary); }
+
+  /* Export Card */
+  .export-card {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 14px;
+    padding: 22px;
+    transition: all 0.2s;
+  }
+  .export-card:hover { background: var(--nw-bg-card-hover); transform: translateY(-2px); }
+  .export-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 14px;
+  }
+  .export-card-title {
+    font-size: 14px; font-weight: 700;
+    color: var(--nw-text-primary); margin-bottom: 6px;
+  }
+  .export-card-desc {
+    font-size: 12px; color: var(--nw-text-muted); margin-bottom: 16px; line-height: 1.5;
+  }
+  .export-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .export-btn {
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    text-decoration: none;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-csv {
+    background: rgba(34,197,94,0.15);
+    color: var(--nw-success);
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+  .btn-csv:hover { background: rgba(34,197,94,0.25); color: var(--nw-success); }
+  .btn-pdf {
+    background: rgba(239,68,68,0.12);
+    color: var(--nw-danger);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .btn-pdf:hover { background: rgba(239,68,68,0.22); color: var(--nw-danger); }
+
+  /* Severity bar */
+  .sev-bar { height: 8px; border-radius: 4px; }
+
+  /* Tabs custom styling */
+  .nw-tab-link {
+    color: var(--nw-text-muted) !important;
+    font-weight: 600;
+    font-size: 13px;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    background: transparent !important;
+    transition: all 0.2s;
+    padding: 12px 18px !important;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .nw-tab-link:hover {
+    color: var(--nw-text-primary) !important;
+  }
+  .nw-tab-link.active {
+    color: var(--nw-accent) !important;
+    border-bottom: 2px solid var(--nw-accent) !important;
+  }
+  .active-alerts-border { border-color: rgba(239, 68, 68, 0.3) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Page Header ─────────────────────────────────────────────────── -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
+      Reports & Audit Module
+    </h1>
+    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
+      Generated at {{ report_generated_at|date:"d F Y — H:i" }} UTC
+    </p>
+  </div>
+  <span class="nw-badge nw-badge-secondary">
+    <i class="bi bi-file-earmark-bar-graph-fill"></i>
+    {{ date_from|default:"All time" }} → {{ date_to|default:"Present" }}
+  </span>
+</div>
+
+<form method="get" id="report-filter-form">
+
+  <div class="report-filter-bar">
+    <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px; white-space:nowrap;">
+      <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
+    </div>
+
+    <!-- Date From -->
+    <div class="filter-group">
+      <label class="filter-label">From Date</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
+    </div>
+
+    <!-- Date To -->
+    <div class="filter-group">
+      <label class="filter-label">To Date</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
+    </div>
+
+    <!-- IP Address search -->
+    <div class="filter-group">
+      <label class="filter-label">IP Address</label>
+      <input type="text" name="ip_address" value="{{ ip_address }}"
+        class="filter-input" placeholder="e.g. 192.168" style="width:130px;" />
+    </div>
+
+    <!-- URL search -->
+    <div class="filter-group">
+      <label class="filter-label">URL Contains</label>
+      <input type="text" name="url_search" value="{{ url_search }}"
+        class="filter-input" placeholder="e.g. /admin" style="width:130px;" />
+    </div>
+
+    <!-- Severity -->
+    <div class="filter-group">
+      <label class="filter-label">Severity</label>
+      <select name="severity" class="filter-input">
+        <option value="">All</option>
+        <option value="critical" {% if severity == 'critical' %}selected{% endif %}>Critical</option>
+        <option value="high"     {% if severity == 'high'     %}selected{% endif %}>High</option>
+        <option value="medium"   {% if severity == 'medium'   %}selected{% endif %}>Medium</option>
+        <option value="low"      {% if severity == 'low'      %}selected{% endif %}>Low</option>
+      </select>
+    </div>
+
+    <!-- Detection Type -->
+    <div class="filter-group">
+      <label class="filter-label">Detection Type</label>
+      <select name="detection_type" class="filter-input">
+        <option value="">All</option>
+        <option value="traffic_spike" {% if detection_type == 'traffic_spike' %}selected{% endif %}>Traffic Spike</option>
+        <option value="rate_limit" {% if detection_type == 'rate_limit' %}selected{% endif %}>Rate Limit</option>
+        <option value="manual" {% if detection_type == 'manual' %}selected{% endif %}>Manual</option>
+      </select>
+    </div>
+
+    <!-- Alert Status -->
+    <div class="filter-group">
+      <label class="filter-label">Status</label>
+      <select name="alert_status" class="filter-input">
+        <option value="">All</option>
+        <option value="active"   {% if alert_status == 'active'   %}selected{% endif %}>Active</option>
+        <option value="resolved" {% if alert_status == 'resolved' %}selected{% endif %}>Resolved</option>
+      </select>
+    </div>
+
+    <!-- Request Method -->
+    <div class="filter-group">
+      <label class="filter-label">Method</label>
+      <select name="request_method" class="filter-input">
+        <option value="">All</option>
+        <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
+        <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
+        <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
+        <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
+      </select>
+    </div>
+
+    <button type="submit" class="filter-btn btn-primary-nw">
+      <i class="bi bi-search"></i> Apply
+    </button>
+    <a href="{% url 'reports' %}" class="filter-btn btn-ghost-nw">
+      <i class="bi bi-x-lg"></i> Clear
+    </a>
+  </div>
+</form>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 1 — Summary Statistics KPIs                              -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-2">
+    <div class="nw-card" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">TOTAL REQUESTS</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-accent);">{{ total_traffic }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="nw-card" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">UNIQUE IPs</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-info);">{{ unique_ips }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="nw-card" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">TOTAL ALERTS</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-warning);">{{ total_alerts }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="nw-card {% if active_alerts > 0 %}active-alerts-border{% endif %}" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">ACTIVE ALERTS</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-danger);">{{ active_alerts }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="nw-card" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">RESOLVED</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-success);">{{ resolved_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="nw-card" style="padding:16px; text-align:center;">
+      <div style="font-size:10px; color:var(--nw-text-muted); margin-bottom:4px;">CRITICAL</div>
+      <div style="font-size:28px; font-weight:800; color:var(--nw-danger);">
+        {{ severity_summary.critical }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 2 — Export Buttons                                        -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <!-- Traffic Report Card -->
+  <div class="col-md-6">
+    <div class="export-card">
+      <div class="export-icon icon-blue">
+        <i class="bi bi-activity"></i>
+      </div>
+      <div class="export-card-title">Traffic Activity Report</div>
+      <div class="export-card-desc">
+        Complete log of all HTTP requests captured by NetWatch.
+        Includes IP address, URL accessed, method, and timestamp.
+        {% if date_from or date_to %}Filtered to selected date range.{% endif %}
+        <br><strong style="color:var(--nw-accent);">{{ total_traffic }}</strong> records to export.
+      </div>
+      <div class="export-btns">
+        <a href="{% url 'export_traffic_csv' %}?date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}"
+          class="export-btn btn-csv">
+          <i class="bi bi-filetype-csv"></i> Export CSV
+        </a>
+        <a href="{% url 'export_traffic_pdf' %}?date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}"
+          class="export-btn btn-pdf">
+          <i class="bi bi-filetype-pdf"></i> Export PDF
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- DDoS Incident Report Card -->
+  <div class="col-md-6">
+    <div class="export-card">
+      <div class="export-icon icon-red">
+        <i class="bi bi-shield-exclamation"></i>
+      </div>
+      <div class="export-card-title">DDoS Incident Report</div>
+      <div class="export-card-desc">
+        All DDoS alerts generated by the detection engine including
+        severity level, request counts, and resolution status.
+        {% if date_from or date_to %}Filtered to selected date range.{% endif %}
+        <br><strong style="color:var(--nw-danger);">{{ total_alerts }}</strong> incidents to export.
+      </div>
+      <div class="export-btns">
+        <a href="{% url 'export_alerts_csv' %}?date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&sort={{ sort }}"
+          class="export-btn btn-csv">
+          <i class="bi bi-filetype-csv"></i> Export CSV
+        </a>
+        <a href="{% url 'export_alerts_pdf' %}?date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&sort={{ sort }}"
+          class="export-btn btn-pdf">
+          <i class="bi bi-filetype-pdf"></i> Export PDF
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 3 — Top Attacking IPs + Severity Breakdown               -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <!-- Top Attacking IPs -->
+  <div class="col-xl-6">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:16px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-crosshair" style="color:var(--nw-danger);"></i>
+          Top Attacking IP Addresses
+        </div>
+        <span class="nw-badge nw-badge-danger">By Alert Count</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+      <div style="overflow-x:auto;">
+        <table class="nw-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>IP Address</th>
+              <th>Alert Count</th>
+              <th>Traffic Rank</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ip in top_attacking_ips %}
+            <tr>
+              <td style="color:var(--nw-text-muted); font-size:12px;">{{ forloop.counter }}</td>
+              <td><span class="nw-ip">{{ ip.ip_address }}</span></td>
+              <td>
+                <span style="font-weight:700; color:var(--nw-danger);">
+                  {{ ip.alert_count }}
+                </span>
+              </td>
+              <td>
+                {% with max=top_attacking_ips.0.alert_count %}
+                {% widthratio ip.alert_count max 100 as calculated_width %}
+                <div style="width:80px; height:6px; background:var(--nw-border); border-radius:3px; overflow:hidden;">
+                  <div style="height:100%;
+                    background:linear-gradient(90deg, var(--nw-danger), #f97316);
+                    border-radius:3px;" data-width="{{ calculated_width }}"></div>
+                </div>
+                {% endwith %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4">
+                <div class="nw-empty-state"><i class="bi bi-shield-check"></i><p>No alerts recorded.</p></div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Severity Summary -->
+  <div class="col-xl-6">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:16px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-bar-chart-steps" style="color:var(--nw-warning);"></i>
+          Alert Severity Distribution
+        </div>
+        <span class="nw-badge nw-badge-secondary">{{ total_alerts }} Total</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+      <div style="padding:20px;">
+        {% if total_alerts > 0 %}
+
+        {% with critical=severity_summary.critical high=severity_summary.high medium=severity_summary.medium low=severity_summary.low %}
+
+        <!-- Critical -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:600; color:var(--nw-danger);">
+              <i class="bi bi-exclamation-octagon-fill"></i> Critical
+            </span>
+            <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">{{ critical }}</span>
+          </div>
+          {% widthratio critical total_alerts 100 as w_critical %}
+          <div style="height:10px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+            <div class="sev-bar" style="background:var(--nw-danger);" data-width="{{ w_critical }}"></div>
+          </div>
+        </div>
+
+        <!-- High -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:600; color:var(--nw-orange);">
+              <i class="bi bi-exclamation-triangle-fill"></i> High
+            </span>
+            <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">{{ high }}</span>
+          </div>
+          {% widthratio high total_alerts 100 as w_high %}
+          <div style="height:10px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+            <div class="sev-bar" style="background:var(--nw-orange);" data-width="{{ w_high }}"></div>
+          </div>
+        </div>
+
+        <!-- Medium -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:600; color:var(--nw-warning);">
+              <i class="bi bi-dash-circle-fill"></i> Medium
+            </span>
+            <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">{{ medium }}</span>
+          </div>
+          {% widthratio medium total_alerts 100 as w_medium %}
+          <div style="height:10px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+            <div class="sev-bar" style="background:var(--nw-warning);" data-width="{{ w_medium }}"></div>
+          </div>
+        </div>
+
+        <!-- Low -->
+        <div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:600; color:var(--nw-info);">
+              <i class="bi bi-info-circle-fill"></i> Low
+            </span>
+            <span style="font-size:13px; font-weight:700; color:var(--nw-text-primary);">{{ low }}</span>
+          </div>
+          {% widthratio low total_alerts 100 as w_low %}
+          <div style="height:10px; background:var(--nw-border); border-radius:5px; overflow:hidden;">
+            <div class="sev-bar" style="background:var(--nw-info);" data-width="{{ w_low }}"></div>
+          </div>
+        </div>
+
+        {% endwith %}
+
+        {% else %}
+        <div class="nw-empty-state">
+          <i class="bi bi-shield-check" style="color:var(--nw-success);"></i>
+          <p style="color:var(--nw-success);">No alerts in selected period.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 4 — Incident & Traffic Log Center (Tabbed)               -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="nw-card" style="padding:0; overflow:hidden;">
+  
+  <!-- Tabs Navigation Header -->
+  <ul class="nav nav-tabs border-0 px-3 pt-2" style="background:var(--nw-bg-card-hover); border-bottom: 1px solid var(--nw-border) !important;">
+    <li class="nav-item">
+      <a class="nw-tab-link {% if active_tab == 'alerts' %}active{% endif %}" 
+         href="?tab=alerts&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}&sort={{ sort }}">
+        <i class="bi bi-bell-fill me-1"></i> DDoS Alerts Log
+        <span class="badge rounded-pill bg-danger ms-2" style="font-size:10px;">{{ page_obj.paginator.count }}</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nw-tab-link {% if active_tab == 'traffic' %}active{% endif %}" 
+         href="?tab=traffic&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}&sort={{ sort }}">
+        <i class="bi bi-activity me-1"></i> Traffic Activity Log
+        <span class="badge rounded-pill bg-info ms-2" style="font-size:10px;">{{ traffic_page_obj.paginator.count }}</span>
+      </a>
+    </li>
+  </ul>
+
+  {% if active_tab == 'alerts' %}
+  <!-- Alerts Log Table -->
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          {# Sortable column headers — clicking toggles asc/desc order #}
+          <th style="width:50px;">#</th>
+
+          {# IP Address sort #}
+          <th>
+            <a href="?tab=alerts&{% if sort == 'ip_address' %}sort=-ip_address{% else %}sort=ip_address{% endif %}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+              style="color:inherit; text-decoration:none;">
+              IP Address
+              {% if sort == 'ip_address' %}<i class="bi bi-caret-up-fill"></i>
+              {% elif sort == '-ip_address' %}<i class="bi bi-caret-down-fill"></i>
+              {% else %}<i class="bi bi-arrow-down-up" style="opacity:.4;"></i>{% endif %}
+            </a>
+          </th>
+
+          {# Req/Min sort #}
+          <th>
+            <a href="?tab=alerts&{% if sort == 'request_count' %}sort=-request_count{% else %}sort=request_count{% endif %}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+              style="color:inherit; text-decoration:none;">
+              Req/Min
+              {% if sort == 'request_count' %}<i class="bi bi-caret-up-fill"></i>
+              {% elif sort == '-request_count' %}<i class="bi bi-caret-down-fill"></i>
+              {% else %}<i class="bi bi-arrow-down-up" style="opacity:.4;"></i>{% endif %}
+            </a>
+          </th>
+
+          {# Severity sort #}
+          <th>
+            <a href="?tab=alerts&{% if sort == 'severity' %}sort=-severity{% else %}sort=severity{% endif %}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+              style="color:inherit; text-decoration:none;">
+              Severity
+              {% if sort == 'severity' %}<i class="bi bi-caret-up-fill"></i>
+              {% elif sort == '-severity' %}<i class="bi bi-caret-down-fill"></i>
+              {% else %}<i class="bi bi-arrow-down-up" style="opacity:.4;"></i>{% endif %}
+            </a>
+          </th>
+
+          <th>Detection Type</th>
+          <th>Status</th>
+
+          {# Timestamp sort #}
+          <th>
+            <a href="?tab=alerts&{% if sort == '-timestamp' %}sort=timestamp{% else %}sort=-timestamp{% endif %}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+              style="color:inherit; text-decoration:none;">
+              Detected
+              {% if sort == 'timestamp' %}<i class="bi bi-caret-up-fill"></i>
+              {% elif sort == '-timestamp' or sort == '' %}<i class="bi bi-caret-down-fill"></i>
+              {% else %}<i class="bi bi-arrow-down-up" style="opacity:.4;"></i>{% endif %}
+            </a>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alert in page_obj %}
+        <tr>
+          <td style="color:var(--nw-text-muted); font-size:12px;">#{{ alert.id }}</td>
+          <td>
+            <a href="{% url 'ip_investigation' %}?ip={{ alert.ip_address }}"
+              style="color:var(--nw-info); text-decoration:none; font-family:'Courier New',monospace; font-weight:600;">
+              {{ alert.ip_address }}
+            </a>
+          </td>
+          <td><span style="font-weight:700;">{{ alert.request_count }}</span></td>
+          <td>
+            {% if alert.severity == 'critical' %}
+            <span class="nw-badge nw-badge-danger">Critical</span>
+            {% elif alert.severity == 'high' %}
+            <span class="nw-badge nw-badge-orange">High</span>
+            {% elif alert.severity == 'medium' %}
+            <span class="nw-badge nw-badge-warning">Medium</span>
+            {% else %}
+            <span class="nw-badge nw-badge-info">Low</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if alert.detection_type == 'traffic_spike' %}
+            <span class="nw-badge nw-badge-info" style="white-space:nowrap;">
+              <i class="bi bi-graph-up-arrow"></i> Traffic Spike
+            </span>
+            {% elif alert.detection_type == 'rate_limit' %}
+            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;">
+              <i class="bi bi-speedometer2"></i> Rate Limit
+            </span>
+            {% else %}
+            <span class="nw-badge nw-badge-secondary" style="white-space:nowrap;">
+              <i class="bi bi-person-fill-gear"></i> {{ alert.detection_type_label }}
+            </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if alert.resolved %}
+            <span class="nw-badge nw-badge-success">Resolved</span>
+            {% else %}
+            <span class="nw-badge nw-badge-danger">Active</span>
+            {% endif %}
+          </td>
+          <td><span class="nw-timestamp">{{ alert.timestamp|date:"d M Y H:i" }}</span></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="nw-empty-state">
+              <i class="bi bi-inbox"></i>
+              <p>No alerts match the current filters.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Alerts Pagination Controls ─────────────────────────────────────────── #}
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-top:1px solid var(--nw-border);">
+    <div style="font-size:12px; color:var(--nw-text-muted);">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      &nbsp;&bull;&nbsp; {{ page_obj.paginator.count }} total records
+    </div>
+    <div style="display:flex; gap:6px;">
+      {% if page_obj.has_previous %}
+      <a href="?page=1&tab=alerts&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-double-left"></i>
+      </a>
+      <a href="?page={{ page_obj.previous_page_number }}&tab=alerts&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+
+      <span style="padding:6px 12px; background:var(--nw-accent); color:white; border-radius:7px; font-size:13px; font-weight:600;">
+        {{ page_obj.number }}
+      </span>
+
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&tab=alerts&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      <a href="?page={{ page_obj.paginator.num_pages }}&tab=alerts&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-double-right"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <!-- Traffic Logs Table -->
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th style="width:180px;">Timestamp (UTC)</th>
+          <th>IP Address</th>
+          <th>URL Accessed</th>
+          <th>Method</th>
+          <th>Security Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in traffic_page_obj %}
+        <tr>
+          <td><span class="nw-timestamp">{{ log.timestamp|date:"d M Y H:i:s" }}</span></td>
+          <td>
+            <a href="{% url 'ip_investigation' %}?ip={{ log.ip_address }}"
+              style="color:var(--nw-info); text-decoration:none; font-family:'Courier New',monospace; font-weight:600; font-size:13px;">
+              {{ log.ip_address }}
+            </a>
+          </td>
+          <td>
+            <span style="color:var(--nw-text-muted); font-size:12.5px; font-family:'Courier New',monospace; word-break:break-all;">
+              {{ log.url_accessed }}
+            </span>
+          </td>
+          <td>
+            <span class="badge bg-secondary" style="font-size:10px;">{{ log.request_method }}</span>
+          </td>
+          <td>
+            {% if log.ip_address in blocked_ips %}
+            <span class="nw-badge nw-badge-danger" style="white-space:nowrap;"><i class="bi bi-slash-circle-fill"></i> Blocked</span>
+            {% elif log.ip_address in alerted_ips %}
+            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;"><i class="bi bi-exclamation-triangle-fill"></i> Threat IP</span>
+            {% else %}
+            <span class="nw-badge nw-badge-success" style="white-space:nowrap;"><i class="bi bi-shield-check"></i> Safe</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5">
+            <div class="nw-empty-state">
+              <i class="bi bi-inbox"></i>
+              <p>No traffic logs match the current filters.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Traffic Pagination Controls ─────────────────────────────────────────── #}
+  {% if traffic_page_obj.paginator.num_pages > 1 %}
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-top:1px solid var(--nw-border);">
+    <div style="font-size:12px; color:var(--nw-text-muted);">
+      Page {{ traffic_page_obj.number }} of {{ traffic_page_obj.paginator.num_pages }}
+      &nbsp;&bull;&nbsp; {{ traffic_page_obj.paginator.count }} total records
+    </div>
+    <div style="display:flex; gap:6px;">
+      {% if traffic_page_obj.has_previous %}
+      <a href="?traffic_page=1&tab=traffic&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-double-left"></i>
+      </a>
+      <a href="?traffic_page={{ traffic_page_obj.previous_page_number }}&tab=traffic&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+
+      <span style="padding:6px 12px; background:var(--nw-accent); color:white; border-radius:7px; font-size:13px; font-weight:600;">
+        {{ traffic_page_obj.number }}
+      </span>
+
+      {% if traffic_page_obj.has_next %}
+      <a href="?traffic_page={{ traffic_page_obj.next_page_number }}&tab=traffic&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      <a href="?traffic_page={{ traffic_page_obj.paginator.num_pages }}&tab=traffic&sort={{ sort }}&date_from={{ date_from }}&date_to={{ date_to }}&ip_address={{ ip_address }}&url_search={{ url_search }}&severity={{ severity }}&alert_status={{ alert_status }}&detection_type={{ detection_type }}&request_method={{ request_method }}"
+        class="filter-btn btn-ghost-nw" style="padding:6px 10px;">
+        <i class="bi bi-chevron-double-right"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('[data-width]').forEach(function (el) {
+    const w = el.getAttribute('data-width');
+    if (w) el.style.width = w + '%';
+  });
+});
+</script>
+{% endblock %}

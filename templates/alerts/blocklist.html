@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block title %}IP Blocklist{% endblock %}
+{% block nav_blocklist %}active{% endblock %}
+{% block page_title %}IP Blocklist{% endblock %}
+{% block page_breadcrumb %}Blocked Addresses Management{% endblock %}
+
+{% block extra_css %}
+<style>
+  .add-ip-panel {
+    background: var(--nw-bg-card);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+  }
+  .add-ip-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--nw-text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .add-ip-form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .add-ip-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .add-ip-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--nw-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .add-ip-input {
+    background: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-primary);
+    border-radius: 7px;
+    padding: 9px 13px;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 180px;
+  }
+  .add-ip-input:focus { border-color: var(--nw-danger); }
+  .add-ip-reason {
+    font-family: 'Inter', sans-serif;
+    min-width: 260px;
+  }
+  .btn-block-ip {
+    padding: 9px 18px;
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    color: var(--nw-danger);
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-block-ip:hover {
+    background: rgba(239,68,68,0.28);
+    color: var(--nw-danger);
+  }
+  .added-by-cell {
+    font-size: 12px;
+    color: var(--nw-text-muted);
+  }
+  .blocked-ip-chip {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--nw-danger);
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 6px;
+    padding: 3px 9px;
+    display: inline-block;
+  }
+  .reason-cell {
+    font-size: 12px;
+    color: var(--nw-text-primary);
+    max-width: 240px;
+  }
+  .alert-custom-danger { background: rgba(239, 68, 68, 0.12) !important; color: var(--nw-danger) !important; }
+  .alert-custom-warning { background: rgba(245, 158, 11, 0.12) !important; color: var(--nw-warning) !important; }
+  .alert-custom-success { background: rgba(34, 197, 94, 0.12) !important; color: var(--nw-success) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Page Header ──────────────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
+      IP Blocklist Management
+    </h1>
+    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
+      Blocked IPs receive an immediate <strong>403 Forbidden</strong> response — all traffic is dropped.
+    </p>
+  </div>
+  <span class="nw-badge nw-badge-danger" style="font-size:13px; padding:8px 14px;">
+    <i class="bi bi-shield-lock-fill"></i>
+    {{ blocklist|length }} IP{{ blocklist|length|pluralize }} Blocked
+  </span>
+</div>
+
+{# ── Flash Messages ────────────────────────────────────────────────────────── #}
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert d-flex align-items-center gap-2 {% if message.tags == 'error' %}alert-custom-danger{% elif message.tags == 'warning' %}alert-custom-warning{% else %}alert-custom-success{% endif %}"
+    style="font-size:13px; border-radius:10px; margin-bottom:16px; border:none;">
+    <i class="bi {% if message.tags == 'error' %}bi-exclamation-triangle-fill{% elif message.tags == 'warning' %}bi-exclamation-circle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+    {{ message }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 1 — Manual Add IP Panel                                           #}
+{# POST-only form. The view validates format, checks duplicates, then        #}
+{# creates the IPBlocklist entry with added_by and reason.                   #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="add-ip-panel">
+
+  <div class="add-ip-title">
+    <i class="bi bi-shield-plus" style="color:var(--nw-danger); font-size:16px;"></i>
+    Manually Block an IP Address
+  </div>
+
+  <form method="post" action="{% url 'blocklist_add_ip' %}">
+    {% csrf_token %}
+
+    <div class="add-ip-form-row">
+
+      {# ── IP Address field ──────────────────────────────────────────────── #}
+      {# Validated server-side with Python's ipaddress module (IPv4 + IPv6) #}
+      <div class="add-ip-group">
+        <label class="add-ip-label" for="id_ip_address">
+          IP Address <span style="color:var(--nw-danger);">*</span>
+        </label>
+        <input
+          type="text"
+          id="id_ip_address"
+          name="ip_address"
+          class="add-ip-input"
+          placeholder="e.g. 192.168.1.55 or ::1"
+          autocomplete="off"
+          required
+        />
+      </div>
+
+      {# ── Reason field (optional) ───────────────────────────────────────── #}
+      {# Stored in IPBlocklist.reason for audit trail and display.           #}
+      <div class="add-ip-group" style="flex:1;">
+        <label class="add-ip-label" for="id_reason">
+          Block Reason <span style="color:var(--nw-text-muted);">(optional)</span>
+        </label>
+        <input
+          type="text"
+          id="id_reason"
+          name="reason"
+          class="add-ip-input add-ip-reason"
+          placeholder="e.g. Threat intelligence feed, manual investigation"
+          maxlength="255"
+          style="width:100%;"
+        />
+      </div>
+
+      {# ── Submit ────────────────────────────────────────────────────────── #}
+      <div class="add-ip-group" style="align-self:flex-end;">
+        <button type="submit" class="btn-block-ip"
+          onclick="return confirm('Block this IP address? It will immediately start receiving 403 errors.');">
+          <i class="bi bi-shield-lock-fill"></i>
+          Block IP
+        </button>
+      </div>
+
+    </div>
+
+    {# ── Validation hint ───────────────────────────────────────────────── #}
+    <div style="margin-top:10px; font-size:11px; color:var(--nw-text-muted);">
+      <i class="bi bi-info-circle"></i>
+      Accepts standard IPv4 (e.g. <code style="color:var(--nw-info);">10.0.0.1</code>) and IPv6
+      (e.g. <code style="color:var(--nw-info);">2001:db8::1</code>) addresses.
+      Duplicate IPs are automatically rejected.
+      If no reason is given, <em>"Manually blocked by administrator"</em> will be recorded.
+    </div>
+
+  </form>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 2 — Blocked IP Table                                              #}
+{# Shows: IP, reason, date added, added by, unblock action                  #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="nw-card" style="padding:0; overflow:hidden;">
+  <div class="nw-section-header" style="padding:16px 20px 0;">
+    <div class="nw-section-title">
+      <i class="bi bi-shield-lock-fill" style="color:var(--nw-danger);"></i>
+      Currently Blocked IPs
+    </div>
+    <span class="nw-badge nw-badge-danger">
+      {{ blocklist|length }} Active Block{{ blocklist|length|pluralize }}
+    </span>
+  </div>
+  <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th>IP Address</th>
+          <th>Block Reason</th>
+          <th>Blocked At</th>
+          {# NEW: "Added By" column — shows which admin performed the block #}
+          <th>Added By</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in blocklist %}
+        <tr>
+
+          {# Chip-styled IP address for visual prominence #}
+          <td>
+            <span class="blocked-ip-chip">{{ b.ip_address }}</span>
+          </td>
+
+          {# Reason — shows "—" if no reason was recorded #}
+          <td>
+            <span class="reason-cell">
+              {{ b.reason|default:"—" }}
+            </span>
+          </td>
+
+          {# Date and time the block was created (from auto_now_add field) #}
+          <td>
+            <span class="nw-timestamp">{{ b.added_at|date:"d M Y" }}</span>
+            <div style="font-size:11px; color:var(--nw-text-muted);">
+              {{ b.added_at|date:"H:i" }} UTC
+            </div>
+          </td>
+
+          {# Added By — shows username if recorded, "System" if added by middleware/alert #}
+          <td>
+            <span class="added-by-cell">
+              {% if b.added_by %}
+                <i class="bi bi-person-fill" style="color:var(--nw-accent);"></i>
+                {{ b.added_by.username }}
+              {% else %}
+                <i class="bi bi-cpu-fill" style="color:var(--nw-text-muted);"></i>
+                System
+              {% endif %}
+            </span>
+          </td>
+
+          {# Unblock — POST form with confirmation dialog #}
+          <td style="text-align:right;">
+            <form method="post" action="{% url 'unblock_ip' b.pk %}"
+              onsubmit="return confirm('Remove {{ b.ip_address }} from the blocklist?\nThis IP will immediately be allowed to send requests again.');">
+              {% csrf_token %}
+              <button type="submit"
+                style="padding:6px 14px; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3);
+                  color:var(--nw-success); border-radius:7px; font-size:12px; font-weight:600;
+                  cursor:pointer; font-family:'Inter',sans-serif; display:inline-flex; align-items:center; gap:5px;
+                  transition:all 0.2s;"
+                onmouseover="this.style.background='rgba(34,197,94,0.2)'"
+                onmouseout="this.style.background='rgba(34,197,94,0.1)'">
+                <i class="bi bi-unlock-fill"></i> Unblock
+              </button>
+            </form>
+          </td>
+
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5">
+            <div class="nw-empty-state" style="padding:40px 20px;">
+              <i class="bi bi-shield-check" style="color:var(--nw-success); font-size:40px; opacity:0.7;"></i>
+              <p style="color:var(--nw-success); font-size:14px; font-weight:600; margin:8px 0 4px;">
+                No IPs are currently blocked.
+              </p>
+              <p style="font-size:12px; color:var(--nw-text-muted); margin:0;">
+                Use the form above to manually block a suspicious IP address.
+              </p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

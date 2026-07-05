@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+
+{% block title %}Alert Management{% endblock %}
+{% block nav_alerts %}active{% endblock %}
+{% block page_title %}Alert Management{% endblock %}
+{% block page_breadcrumb %}Security Incident Response{% endblock %}
+
+{% block extra_css %}
+<style>
+  .filter-bar {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-label { font-size: 10px; font-weight: 600; color: var(--nw-text-muted);
+    text-transform: uppercase; letter-spacing: 0.8px; }
+  .filter-input {
+    background: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-primary);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .filter-input:focus { border-color: var(--nw-accent); }
+  .filter-input option { background: var(--nw-bg-card); }
+  .filter-btn {
+    padding: 8px 18px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  .filter-btn-primary { background: var(--nw-accent); color: white; }
+  .filter-btn-primary:hover { background: #2563eb; }
+  .filter-btn-ghost { background: var(--nw-bg-page); border: 1px solid var(--nw-border);
+    color: var(--nw-text-muted); text-decoration: none; display:inline-flex; align-items:center; }
+  .filter-btn-ghost:hover { color: var(--nw-text-primary); }
+
+  /* Alert row styling */
+  .alert-row-critical td:first-child { border-left: 3px solid var(--nw-danger); }
+  .alert-row-high td:first-child { border-left: 3px solid var(--nw-orange); }
+  .alert-row-medium td:first-child { border-left: 3px solid var(--nw-warning); }
+  .alert-row-low td:first-child { border-left: 3px solid var(--nw-info); }
+
+  /* Resolve button */
+  .resolve-btn {
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: var(--nw-success);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .resolve-btn:hover { background: rgba(34,197,94,0.2); }
+
+  /* Pagination */
+  .nw-pagination { display: flex; gap: 6px; align-items: center; }
+  .nw-page-btn {
+    padding: 6px 12px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-muted);
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .nw-page-btn:hover { color: var(--nw-text-primary); border-color: var(--nw-accent); }
+  .nw-page-btn.active { background: var(--nw-accent); color: white; border-color: var(--nw-accent); }
+  .nw-page-btn.disabled { opacity: 0.4; pointer-events: none; }
+  .active-alerts-border { border-color: rgba(239, 68, 68, 0.3) !important; }
+  .critical-alerts-border { border-color: rgba(239, 68, 68, 0.5) !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Django Messages ─────────────────────────────────────────────────── -->
+{% if messages %}
+{% for message in messages %}
+<div style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:10px;
+  padding:12px 18px; margin-bottom:20px; color:var(--nw-success); font-size:13px; font-weight:500;
+  display:flex; align-items:center; gap:8px;">
+  <i class="bi bi-check-circle-fill"></i>
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ── KPI Row ──────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="nw-card" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">TOTAL ALERTS</div>
+      <div style="font-size:26px; font-weight:800; color:var(--nw-text-primary);">{{ total_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="nw-card {% if active_count > 0 %}active-alerts-border{% endif %}" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">ACTIVE</div>
+      <div style="font-size:26px; font-weight:800;" class="{% if active_count > 0 %}text-danger{% endif %}">
+        {{ active_count }}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="nw-card" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">RESOLVED</div>
+      <div style="font-size:26px; font-weight:800; color:var(--nw-success);">{{ resolved_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="nw-card {% if critical_count > 0 %}critical-alerts-border{% endif %}" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">CRITICAL (ACTIVE)</div>
+      <div style="font-size:26px; font-weight:800; color:var(--nw-danger);">{{ critical_count }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Filter Bar ──────────────────────────────────────────────────────── -->
+<form method="get" class="filter-bar">
+  <div class="filter-group">
+    <label class="filter-label">Status</label>
+    <select name="status" class="filter-input" style="min-width:130px;">
+      <option value="" {% if not status %}selected{% endif %}>All Statuses</option>
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active Only</option>
+      <option value="resolved" {% if status == 'resolved' %}selected{% endif %}>Resolved Only</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Severity</label>
+    <select name="severity" class="filter-input" style="min-width:130px;">
+      <option value="" {% if not severity %}selected{% endif %}>All Severities</option>
+      <option value="critical" {% if severity == 'critical' %}selected{% endif %}>🔴 Critical</option>
+      <option value="high"     {% if severity == 'high' %}selected{% endif %}>🟠 High</option>
+      <option value="medium"   {% if severity == 'medium' %}selected{% endif %}>🟡 Medium</option>
+      <option value="low"      {% if severity == 'low' %}selected{% endif %}>🔵 Low</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Detection Type</label>
+    <select name="detection_type" class="filter-input" style="min-width:140px;">
+      <option value="" {% if not detection_type %}selected{% endif %}>All Types</option>
+      <option value="traffic_spike" {% if detection_type == 'traffic_spike' %}selected{% endif %}>Traffic Spike</option>
+      <option value="rate_limit" {% if detection_type == 'rate_limit' %}selected{% endif %}>Rate Limit</option>
+      <option value="manual" {% if detection_type == 'manual' %}selected{% endif %}>Manual</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">From Date</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">To Date</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
+  </div>
+  <div style="display:flex; gap:8px; padding-bottom:1px;">
+    <button type="submit" class="filter-btn filter-btn-primary">
+      <i class="bi bi-funnel-fill" style="margin-right:5px;"></i>Apply Filter
+    </button>
+    <a href="{% url 'alerts_list' %}" class="filter-btn filter-btn-ghost">
+      <i class="bi bi-x-lg" style="margin-right:5px;"></i>Clear
+    </a>
+  </div>
+</form>
+
+<!-- ── Alerts Table ────────────────────────────────────────────────────── -->
+<div class="nw-card" style="padding:0; overflow:hidden;">
+
+  <div class="nw-section-header" style="padding:16px 20px 0;">
+    <div class="nw-section-title">
+      <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
+      Alert History Log
+    </div>
+    <span style="font-size:12px; color:var(--nw-text-muted);">
+      {{ page_obj.paginator.count }} alert{{ page_obj.paginator.count|pluralize }} found
+    </span>
+  </div>
+  <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>IP Address</th>
+          <th>Requests</th>
+          <th>Severity</th>
+          <th>Detection Type</th>
+          <th>Status</th>
+          <th>Detected At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alert in page_obj %}
+        <tr class="alert-row-{{ alert.severity }}">
+          <td style="color:var(--nw-text-muted); font-size:12px;">#{{ alert.id }}</td>
+
+          <td>
+            <a href="{% url 'ip_investigation' %}?ip={{ alert.ip_address }}"
+              style="color:var(--nw-info); text-decoration:none; font-family:'Courier New',monospace; font-weight:600; font-size:13px;"
+              title="Click to perform forensic investigation on this IP">
+              {{ alert.ip_address }}
+            </a>
+          </td>
+
+          <td>
+            <span style="font-weight:700; color:var(--nw-text-primary);">{{ alert.request_count }}</span>
+            <span style="font-size:11px; color:var(--nw-text-muted);"> req/min</span>
+          </td>
+
+          <td>
+            {% if alert.severity == 'critical' %}
+            <span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-octagon-fill"></i>Critical</span>
+            {% elif alert.severity == 'high' %}
+            <span class="nw-badge nw-badge-orange"><i class="bi bi-exclamation-triangle-fill"></i>High</span>
+            {% elif alert.severity == 'medium' %}
+            <span class="nw-badge nw-badge-warning"><i class="bi bi-dash-circle-fill"></i>Medium</span>
+            {% else %}
+            <span class="nw-badge nw-badge-info"><i class="bi bi-info-circle-fill"></i>Low</span>
+            {% endif %}
+          </td>
+
+          {# Detection Type badge — shows which engine generated this alert #}
+          <td>
+            {% if alert.detection_type == 'traffic_spike' %}
+            <span class="nw-badge nw-badge-info" style="white-space:nowrap;">
+              <i class="bi bi-graph-up-arrow"></i> Traffic Spike
+            </span>
+            {% elif alert.detection_type == 'rate_limit' %}
+            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;">
+              <i class="bi bi-speedometer2"></i> Rate Limit
+            </span>
+            {% else %}
+            <span class="nw-badge nw-badge-secondary" style="white-space:nowrap;">
+              <i class="bi bi-person-fill-gear"></i> {{ alert.detection_type_label }}
+            </span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if alert.resolved %}
+            <span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill"></i>Resolved</span>
+            {% else %}
+            <span class="nw-badge nw-badge-danger"><i class="bi bi-record-circle-fill"></i>Active</span>
+            {% endif %}
+          </td>
+
+          <td><span class="nw-timestamp">{{ alert.timestamp|date:"H:i d M Y" }}</span></td>
+
+          <td>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <a href="{% url 'alert_detail' alert.pk %}"
+                style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); color:var(--nw-accent);
+                border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; text-decoration:none;
+                transition:all 0.2s;">
+                <i class="bi bi-eye-fill"></i> View
+              </a>
+
+              {% if not alert.resolved %}
+              <form method="post" action="{% url 'resolve_alert' alert.pk %}"
+                style="display:inline;"
+                onsubmit="return confirm('Mark alert #{{ alert.id }} as resolved?')">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="alerts_list" />
+                <button type="submit" class="resolve-btn">
+                  <i class="bi bi-check2"></i> Resolve
+                </button>
+              </form>
+              {% endif %}
+              
+              {% if is_admin_user %}
+              <form method="post" action="{% url 'block_ip' alert.pk %}"
+                style="display:inline;"
+                onsubmit="return confirm('Add IP {{ alert.ip_address }} to blocklist?')">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="alerts_list" />
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:11px; font-weight:600; padding:5px 10px;">
+                  <i class="bi bi-shield-lock"></i> Block IP
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="nw-empty-state">
+              <i class="bi bi-shield-check" style="color:var(--nw-success); opacity:0.6;"></i>
+              <p style="color:var(--nw-success);">No alerts match your filter.</p>
+              <p style="font-size:12px; color:var(--nw-text-muted);">
+                Try clearing the filters or generating some test traffic.
+              </p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Pagination ──────────────────────────────────────────────────── -->
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="padding:16px 20px; border-top:1px solid var(--nw-border);
+    display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-size:12px; color:var(--nw-text-muted);">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </span>
+    <div class="nw-pagination">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&status={{ status }}&severity={{ severity }}&detection_type={{ detection_type }}&date_from={{ date_from }}&date_to={{ date_to }}"
+        class="nw-page-btn"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+      {% if page_obj.number == num %}
+      <span class="nw-page-btn active">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+      <a href="?page={{ num }}&status={{ status }}&severity={{ severity }}&detection_type={{ detection_type }}&date_from={{ date_from }}&date_to={{ date_to }}"
+        class="nw-page-btn">{{ num }}</a>
+      {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&status={{ status }}&severity={{ severity }}&detection_type={{ detection_type }}&date_from={{ date_from }}&date_to={{ date_to }}"
+        class="nw-page-btn"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

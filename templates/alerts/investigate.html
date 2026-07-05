@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+
+{% block title %}Security Investigation Center{% endblock %}
+{% block nav_investigate %}active{% endblock %}
+{% block page_title %}Security Investigation Center{% endblock %}
+{% block page_breadcrumb %}Threat Hunting & Forensics{% endblock %}
+
+{% block extra_css %}
+<style>
+  .timeline-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .timeline-item {
+    position: relative;
+    padding-left: 20px;
+    border-left: 2px solid var(--nw-border);
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--nw-border);
+    border: 2px solid var(--nw-bg-card);
+  }
+  .timeline-item.critical::before { background-color: var(--nw-danger); }
+  .timeline-item.high::before { background-color: var(--nw-orange); }
+  .timeline-item.medium::before { background-color: var(--nw-warning); }
+  .timeline-item.low::before { background-color: var(--nw-info); }
+  
+  .threat-score-card {
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 14px;
+  }
+  .threat-level-critical { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35); }
+  .threat-level-high { background: rgba(249, 115, 22, 0.10); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.35); }
+  .threat-level-medium { background: rgba(245, 158, 11, 0.10); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.30); }
+  .threat-level-low { background: rgba(34, 197, 94, 0.08); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.25); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Search Header Bar -->
+<div class="nw-card mb-4" style="padding: 18px 20px;">
+  <form method="get" action="{% url 'ip_investigation' %}" class="row g-2 align-items-center">
+    <div class="col-md-9 col-sm-8">
+      <div class="input-group">
+        <span class="input-group-text" style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-muted);">
+          <i class="bi bi-search"></i>
+        </span>
+        <input type="text" name="ip" class="form-control" placeholder="Search IP address for deep forensics (e.g. 192.168.1.1)..." value="{{ ip|default:'' }}"
+          style="background:var(--nw-bg-page); border:1px solid var(--nw-border); color:var(--nw-text-primary); border-top-left-radius:0; border-bottom-left-radius:0; font-family:'Courier New', monospace;" required>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary w-100" style="background:var(--nw-accent); border:none; font-weight:600;">
+        Triage IP
+      </button>
+      {% if mode == 'dossier' %}
+      <a href="{% url 'ip_investigation' %}" class="btn btn-outline-secondary" style="border-radius:8px; display:inline-flex; align-items:center; justify-content:center;">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-4" style="font-size:13px; border-radius:10px;">
+    {{ message }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<!-- ========================================================================= -->
+<!-- MODE 1: INDIVIDUAL IP DOSSIER MODE                                         -->
+<!-- ========================================================================= -->
+{% if mode == 'dossier' %}
+<div class="row g-4">
+  
+  <!-- Left Side: Threat Intel Dossier -->
+  <div class="col-lg-4">
+    
+    <!-- Threat Assessment Score -->
+    <div class="nw-card mb-4 text-center">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:8px;">Threat Level Score</div>
+      <div class="threat-score-card mb-3 threat-level-{{ threat_level }}">
+        <i class="bi {{ threat_icon }} me-1"></i> {{ threat_level|upper }} Risk
+      </div>
+      
+      <div style="height:1px; background:var(--nw-border); margin:15px 0;"></div>
+      
+      <div class="row g-2 mb-2 text-start">
+        <div class="col-6">
+          <div style="font-size:10px; color:var(--nw-text-muted);">ACTIVE ALERTS</div>
+          <div style="font-size:16px; font-weight:700;" class="{% if active_alerts_count > 0 %}text-danger{% endif %}">{{ active_alerts_count }}</div>
+        </div>
+        <div class="col-6">
+          <div style="font-size:10px; color:var(--nw-text-muted);">RESOLVED</div>
+          <div style="font-size:16px; font-weight:700; color:var(--nw-success);">{{ resolved_alerts_count }}</div>
+        </div>
+      </div>
+      <div class="row g-2 mb-3 text-start">
+        <div class="col-6">
+          <div style="font-size:10px; color:var(--nw-text-muted);">RATE VIOLATIONS</div>
+          <div style="font-size:16px; font-weight:700; color:var(--nw-warning);">{{ violations_count }}</div>
+        </div>
+        <div class="col-6">
+          <div style="font-size:10px; color:var(--nw-text-muted);">TOTAL REQUESTS</div>
+          <div style="font-size:16px; font-weight:700; color:var(--nw-accent);">{{ total_requests }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IP Metadata Intel -->
+    <div class="nw-card mb-4">
+      <h5 class="mb-3" style="color:var(--nw-text-primary); font-weight:700; font-size:14px;">
+        <i class="bi bi-info-circle me-1" style="color:var(--nw-info);"></i>Forensic Details
+      </h5>
+      
+      <div class="mb-3">
+        <div style="font-size:11px; color:var(--nw-text-muted); font-weight:600; text-transform:uppercase;">Target Address</div>
+        <div style="font-family:'Courier New', monospace; font-weight:700; color:var(--nw-text-primary); font-size:15px;" class="mt-1">{{ ip }}</div>
+      </div>
+
+      <div class="mb-3">
+        <div style="font-size:11px; color:var(--nw-text-muted); font-weight:600; text-transform:uppercase;">Blocklist Status</div>
+        <div class="mt-1">
+          {% if is_blocked %}
+            <span class="nw-badge nw-badge-danger" title="Reason: {{ block_record.reason }}"><i class="bi bi-shield-lock-fill me-1"></i>Blocked IP</span>
+          {% else %}
+            <span class="nw-badge nw-badge-success"><i class="bi bi-shield-check me-1"></i>Allowed IP</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <div style="font-size:11px; color:var(--nw-text-muted); font-weight:600; text-transform:uppercase;">Attack Duration</div>
+        <div style="font-weight:700; color:var(--nw-text-primary);" class="mt-1">
+          <i class="bi bi-clock-history me-1 text-muted"></i> {{ duration_str }}
+        </div>
+      </div>
+
+      <div class="mb-0">
+        <div style="font-size:11px; color:var(--nw-text-muted); font-weight:600; text-transform:uppercase;">Activity Window</div>
+        <div style="font-size:12px; color:var(--nw-text-muted);" class="mt-1">
+          <div><span style="font-weight:600;">First:</span> {{ first_log.timestamp|date:"H:i:s d M Y"|default:"N/A" }}</div>
+          <div class="mt-1"><span style="font-weight:600;">Last:</span> {{ last_log.timestamp|date:"H:i:s d M Y"|default:"N/A" }}</div>
+        </div>
+      </div>
+
+      <!-- Quick Action Mitigations -->
+      <div style="height:1px; background:var(--nw-border); margin:20px 0;"></div>
+      {% if is_admin_user %}
+        {% if is_blocked %}
+          <form method="post" action="{% url 'unblock_ip' block_record.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success w-100" style="font-weight:600; font-size:13px;">
+              <i class="bi bi-shield-check me-1"></i>Unblock Address
+            </button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'blocklist_add_ip' %}">
+            {% csrf_token %}
+            <input type="hidden" name="ip_address" value="{{ ip }}">
+            <input type="hidden" name="reason" value="Manually blocked from Forensic Dossier View.">
+            <button type="submit" class="btn btn-outline-danger w-100" style="font-weight:600; font-size:13px;">
+              <i class="bi bi-shield-lock me-1"></i>Block Address (403)
+            </button>
+          </form>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-secondary text-center mb-0" style="font-size:11px; padding:8px;">
+          Only Administrators can toggle block controls.
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Targeted Endpoints Card -->
+    <div class="nw-card">
+      <h5 class="mb-3" style="color:var(--nw-text-primary); font-weight:700; font-size:14px;">
+        <i class="bi bi-crosshair me-1" style="color:var(--nw-danger);"></i>Targeted Endpoints
+      </h5>
+      {% for item in top_endpoints %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1" style="font-size:12px;">
+            <code style="color:var(--nw-accent); font-weight:600; font-size:12px;">{{ item.url_accessed }}</code>
+            <span class="text-muted fw-bold">{{ item.count }} hits</span>
+          </div>
+          <div class="progress" style="height: 5px; background:var(--nw-border); border-radius:3px;">
+            <div class="progress-bar bg-info" style="width: 100%; border-radius:3px;"></div>
+          </div>
+        </div>
+      {% empty %}
+        <p style="font-size:12px; color:var(--nw-text-muted); margin:0;">No request vectors recorded.</p>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <!-- Right Side: Timelines & Raw Request Logs -->
+  <div class="col-lg-8">
+    
+    <!-- Associated Alerts & Violations -->
+    <div class="row g-3 mb-4">
+      <!-- Alerts Timeline -->
+      <div class="col-md-6">
+        <div class="nw-card" style="height: 100%; max-height: 250px; overflow-y: auto;">
+          <h6 class="mb-3" style="font-weight:700; font-size:13px; color:var(--nw-text-primary);">
+            <i class="bi bi-bell-fill me-1" style="color:var(--nw-danger);"></i>IP Security Alerts ({{ alerts.count }})
+          </h6>
+          <div class="d-flex flex-column gap-2">
+            {% for alert in alerts %}
+              <div class="p-2 border rounded" style="font-size:12px; background:var(--nw-bg-page); border-color:var(--nw-border);">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="nw-badge {{ alert.severity_badge }}" style="font-size:9px; padding:2px 5px;">{{ alert.severity }}</span>
+                  <span class="text-muted text-end" style="font-size:10px;">{{ alert.timestamp|date:"H:i d M" }}</span>
+                </div>
+                <div style="color:var(--nw-text-primary); font-weight:500;">{{ alert.message }}</div>
+              </div>
+            {% empty %}
+              <p class="text-muted text-center py-3 mb-0" style="font-size:12px;">No alerts triggered by this IP.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <!-- Violations Timeline -->
+      <div class="col-md-6">
+        <div class="nw-card" style="height: 100%; max-height: 250px; overflow-y: auto;">
+          <h6 class="mb-3" style="font-weight:700; font-size:13px; color:var(--nw-text-primary);">
+            <i class="bi bi-speedometer2 me-1" style="color:var(--nw-warning);"></i>Rate Violations ({{ violations.count }})
+          </h6>
+          <div class="d-flex flex-column gap-2">
+            {% for violation in violations %}
+              <div class="p-2 border rounded" style="font-size:12px; background:var(--nw-bg-page); border-color:var(--nw-border);">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="badge bg-warning text-dark" style="font-size:9px; padding:2px 5px;">Rate Violation</span>
+                  <span class="text-muted text-end" style="font-size:10px;">{{ violation.timestamp|date:"H:i d M" }}</span>
+                </div>
+                <div style="color:var(--nw-text-primary); font-weight:500;">{{ violation.message }}</div>
+              </div>
+            {% empty %}
+              <p class="text-muted text-center py-3 mb-0" style="font-size:12px;">No rate violations logged.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Raw Request Logs -->
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-list-nested" style="color:var(--nw-accent);"></i>
+          Raw Log Forensics
+        </div>
+        <span class="nw-badge nw-badge-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+      <div style="overflow-x:auto;">
+        <table class="nw-table">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Target URL</th>
+              <th>Detected Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in page_obj %}
+            <tr>
+              <td>
+                {% if log.request_method == 'GET' %}
+                  <span class="nw-method nw-method-get">GET</span>
+                {% elif log.request_method == 'POST' %}
+                  <span class="nw-method nw-method-post">POST</span>
+                {% else %}
+                  <span class="nw-method nw-method-other">{{ log.request_method }}</span>
+                {% endif %}
+              </td>
+              <td><code style="color:var(--nw-accent); font-size:13px; font-weight:600;">{{ log.url_accessed }}</code></td>
+              <td><span class="nw-timestamp">{{ log.timestamp|date:"H:i:s d M Y" }}</span></td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="3">
+                <div class="nw-empty-state" style="padding:40px 0;">
+                  <p style="margin:0; font-size:13px; color:var(--nw-text-muted);">No raw request history logged for this IP.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      {% if page_obj.has_other_pages %}
+      <div class="d-flex justify-content-center py-3" style="border-top:1px solid var(--nw-border);">
+        <div class="nw-pagination">
+          {% if page_obj.has_previous %}
+            <a href="?ip={{ ip }}&page={{ page_obj.previous_page_number }}" class="nw-page-btn">Previous</a>
+          {% endif %}
+          
+          <span class="nw-page-btn active">{{ page_obj.number }}</span>
+          
+          {% if page_obj.has_next %}
+            <a href="?ip={{ ip }}&page={{ page_obj.next_page_number }}" class="nw-page-btn">Next</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+  </div>
+
+</div>
+{% endif %}
+
+<!-- ========================================================================= -->
+<!-- MODE 2: GLOBAL ATTACK TIMELINE TRIAGE MODE                                 -->
+<!-- ========================================================================= -->
+{% if mode == 'timeline' %}
+<!-- Timeline Summary Metrics -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="nw-card text-center" style="padding:15px;">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Total Alerts</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-text-primary);">{{ total_alerts }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="nw-card text-center" style="padding:15px; border-left: 3px solid var(--nw-danger);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Active Threats</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-danger);">{{ unresolved_alerts }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="nw-card text-center" style="padding:15px; border-left: 3px solid var(--nw-warning);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Rate Violations</div>
+      <div style="font-size:24px; font-weight:700; color:var(--nw-warning);">{{ total_violations }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="nw-card text-center style" style="padding:15px; background:var(--nw-bg-page); border: 1px dashed var(--nw-border);">
+      <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Severity Breakdown</div>
+      <div class="d-flex justify-content-center gap-2" style="font-size:11px; margin-top:5px;">
+        <span class="text-danger fw-bold">🔴{{ severity_counts.critical }}</span>
+        <span class="text-orange fw-bold">🟠{{ severity_counts.high }}</span>
+        <span class="text-warning fw-bold">🟡{{ severity_counts.medium }}</span>
+        <span class="text-info fw-bold">🔵{{ severity_counts.low }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  
+  <!-- Left Side: Combined Chronological Feed -->
+  <div class="col-lg-8">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-clock-history" style="color:var(--nw-accent);"></i>
+          Incident Correlation Feed
+        </div>
+        <span class="nw-badge nw-badge-info">Timeline</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+      
+      <div style="padding: 24px; max-height: 700px; overflow-y: auto;">
+        {% for item in timeline %}
+          <div class="timeline-item pb-4 {{ item.severity }}">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+              <div>
+                <a href="{% url 'ip_investigation' %}?ip={{ item.ip }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent); font-size:14px;" title="Triage IP History">
+                  {{ item.ip }}
+                </a>
+                <span class="nw-badge {{ item.badge }} ms-2" style="font-size:9px; padding:2px 6px;">{{ item.label }}</span>
+              </div>
+              <span class="text-muted" style="font-size:11px;"><i class="bi bi-clock me-1"></i>{{ item.timestamp|date:"H:i:s d M Y" }}</span>
+            </div>
+            
+            <p style="font-size:13px; color:var(--nw-text-primary); margin:6px 0 10px; font-weight:500;">
+              {{ item.message }}
+            </p>
+            
+            <div>
+              <a href="{{ item.detail_url }}" style="font-size:11px; text-decoration:none; font-weight:600; color:var(--nw-info);">
+                <i class="bi bi-arrow-right-circle me-1"></i>View Incident Dossier
+              </a>
+            </div>
+          </div>
+        {% empty %}
+          <div class="text-center py-5">
+            <i class="bi bi-shield-check" style="font-size:48px; color:var(--nw-success); opacity:0.3; display:block; margin-bottom:15px;"></i>
+            <p style="font-size:14px; color:var(--nw-text-muted); margin:0;">Zero security incidents detected in the log.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Top Attackers Analytics -->
+  <div class="col-lg-4">
+    <div class="nw-card">
+      <h5 class="mb-4" style="color:var(--nw-text-primary); font-weight:700; font-size:14px;">
+        <i class="bi bi-lightning-fill me-1" style="color:var(--nw-danger);"></i>Top Offending Sources
+      </h5>
+      <div class="d-flex flex-column gap-3">
+        {% for offender in top_offenders %}
+          <div class="p-3 border rounded d-flex justify-content-between align-items-center" style="background:var(--nw-bg-page); border-color:var(--nw-border);">
+            <div>
+              <a href="{% url 'ip_investigation' %}?ip={{ offender.ip_address }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);" title="DDeep Scoping Dossier">
+                {{ offender.ip_address }}
+              </a>
+              <div style="font-size:11px; color:var(--nw-text-muted); margin-top:2px;">
+                {{ offender.alert_count }} Alert{{ offender.alert_count|pluralize }} generated
+              </div>
+            </div>
+            {% if offender.unresolved_count > 0 %}
+              <span class="badge bg-danger rounded-pill" style="font-size:10px;">{{ offender.unresolved_count }} Active</span>
+            {% else %}
+              <span class="badge bg-success rounded-pill" style="font-size:10px;">Resolved</span>
+            {% endif %}
+          </div>
+        {% empty %}
+          <p class="text-muted text-center py-4 mb-0" style="font-size:12px;">No malicious IPs detected yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NetWatch Security System — Access Forbidden" />
+  <title>403 Access Denied | NetWatch</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- CSS Frameworks -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --nw-bg-page: #f8fafc;
+      --nw-bg-card: #ffffff;
+      --nw-border: #e2e8f0;
+      --nw-text-primary: #0f172a;
+      --nw-text-muted: #64748b;
+      --nw-accent: #2563eb;
+      --nw-accent-glow: rgba(37, 99, 235, 0.15);
+      --nw-danger: #dc2626;
+      --nw-success: #16a34a;
+      --nw-warning: #d97706;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--nw-bg-page);
+      color: var(--nw-text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Tech/SOC grid pattern background */
+      background-image: 
+        radial-gradient(rgba(220, 38, 38, 0.03) 1.5px, transparent 1.5px),
+        radial-gradient(rgba(220, 38, 38, 0.03) 1.5px, var(--nw-bg-page) 1.5px);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+      padding: 20px;
+    }
+
+    .nw-forbidden-container {
+      width: 100%;
+      max-width: 580px;
+      text-align: center;
+    }
+
+    .nw-card {
+      background: var(--nw-bg-card);
+      border: 1px solid var(--nw-border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Red threat indicator line at top of card */
+    .nw-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--nw-danger), var(--nw-warning));
+    }
+
+    .nw-error-code {
+      font-size: 96px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--nw-danger);
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+      text-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+    }
+
+    .nw-error-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--nw-text-primary);
+      margin-bottom: 12px;
+    }
+
+    .nw-error-desc {
+      font-size: 14px;
+      color: var(--nw-text-muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .nw-user-metadata {
+      background: var(--nw-bg-page);
+      border: 1px solid var(--nw-border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 28px;
+      font-size: 13px;
+      display: inline-block;
+      text-align: left;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .nw-meta-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .nw-meta-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .nw-meta-label {
+      font-weight: 600;
+      color: var(--nw-text-muted);
+    }
+
+    .nw-meta-value {
+      font-family: monospace;
+      color: var(--nw-text-primary);
+      font-weight: 600;
+    }
+
+    .nw-btn-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--nw-accent), #6366f1);
+      border: none;
+      box-shadow: 0 4px 12px var(--nw-accent-glow);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 16px var(--nw-accent-glow);
+      opacity: 0.95;
+    }
+
+    .btn-outline-secondary {
+      border: 1px solid var(--nw-border);
+      background-color: transparent;
+      color: var(--nw-text-muted);
+    }
+
+    .btn-outline-secondary:hover {
+      background-color: #f1f5f9;
+      color: var(--nw-text-primary);
+      border-color: #cbd5e1;
+    }
+
+    .nw-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--nw-text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="nw-forbidden-container">
+  <div class="nw-card">
+    
+    <!-- Warning Icon -->
+    <div style="font-size: 48px; color: var(--nw-danger); margin-bottom: 12px;">
+      <i class="bi bi-shield-slash-fill"></i>
+    </div>
+
+    <!-- Error Code & Title -->
+    <div class="nw-error-code">403</div>
+    <h1 class="nw-error-title">Access Denied / Forbidden</h1>
+
+    <!-- Explanation -->
+    <p class="nw-error-desc">
+      {% if is_blocked_ip %}
+        Your IP address has been blocked due to suspicious activity (e.g. traffic spikes or rate-limit violations) and added to the network blocklist.
+      {% else %}
+        You do not have the required access permissions to view this resource. 
+        If you believe this is an error, please contact your security administrator.
+      {% endif %}
+    </p>
+
+    <!-- User Information Panel -->
+    <div class="nw-user-metadata">
+      <div class="nw-meta-row">
+        <span class="nw-meta-label">Client IP Address:</span>
+        <span class="nw-meta-value">{{ request.META.REMOTE_ADDR|default:"Unknown" }}</span>
+      </div>
+      
+      {% if request.user.is_authenticated %}
+      <div class="nw-meta-row">
+        <span class="nw-meta-label">Logged In User:</span>
+        <span class="nw-meta-value">{{ request.user.username }}</span>
+      </div>
+      <div class="nw-meta-row">
+        <span class="nw-meta-label">Assigned Role:</span>
+        <span class="nw-meta-value text-capitalize">{{ user_role|default:"Viewer" }}</span>
+      </div>
+      {% endif %}
+      
+      <div class="nw-meta-row">
+        <span class="nw-meta-label">Status Flag:</span>
+        <span class="nw-meta-value text-uppercase" style="color: var(--nw-danger);">
+          {% if is_blocked_ip %}Blocked IP{% else %}Unauthorized{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Buttons Navigation -->
+    <div class="nw-btn-group w-100">
+      {% if is_blocked_ip %}
+        <!-- No navigation allowed since their IP is explicitly blocked -->
+        <div class="alert alert-danger w-100 text-center d-flex align-items-center justify-content-center gap-2 m-0" style="font-size: 14px; font-weight: 600; border-radius: 8px;">
+          <i class="bi bi-shield-lock-fill" style="font-size: 18px;"></i>
+          <span>Terminal Access Terminated: Your IP address is restricted.</span>
+        </div>
+      {% else %}
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'dashboard' %}" class="btn btn-primary">
+            <i class="bi bi-grid-fill"></i> Return to Dashboard
+          </a>
+        {% else %}
+          <a href="{% url 'login' %}" class="btn btn-primary">
+            <i class="bi bi-box-arrow-in-right"></i> Sign In to Portal
+          </a>
+        {% endif %}
+        
+        <button onclick="history.back()" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> Go Back
+        </button>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Footer Info -->
+  <div class="nw-footer">
+    &copy; 2026 NetWatch Security System &bull; Threat Mitigation Portal
+  </div>
+</div>
+
+</body>
+</html>

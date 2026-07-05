@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Rate Limit History{% endblock %}
+{% block nav_rate_limits %}active{% endblock %}
+{% block page_title %}Rate Limit History{% endblock %}
+{% block page_breadcrumb %}Violation Review{% endblock %}
+
+{% block extra_css %}
+<style>
+  .filter-bar {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-label { font-size: 10px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .filter-input {
+    background: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    color: var(--nw-text-primary);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+  }
+  .filter-input:focus { border-color: var(--nw-accent); }
+  .filter-btn {
+    padding: 9px 18px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-btn-primary { background: var(--nw-accent); color: white; }
+  .filter-btn-ghost { background: var(--nw-bg-page); border: 1px solid var(--nw-border); color: var(--nw-text-muted); }
+  .filter-btn-ghost:hover { color: var(--nw-text-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">Rate Limit History</h1>
+    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">Recorded request-rate violations from the middleware</p>
+  </div>
+  <span class="nw-badge nw-badge-danger">
+    <i class="bi bi-shield-exclamation"></i>
+    {{ total_violations }} Total Violations
+  </span>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="nw-card" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">TOTAL VIOLATIONS</div>
+      <div style="font-size:26px; font-weight:800; color:var(--nw-danger);">{{ total_violations }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="nw-card" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">UNIQUE IPs</div>
+      <div style="font-size:26px; font-weight:800; color:var(--nw-accent);">{{ unique_ips }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="nw-card" style="padding:16px;">
+      <div style="font-size:11px; color:var(--nw-text-muted); margin-bottom:4px;">MOST RECENT</div>
+      <div style="font-size:13px; font-weight:600; color:var(--nw-text-primary);">
+        {% if most_recent %}{{ most_recent.ip_address }}{% else %}No violations yet{% endif %}
+      </div>
+      <div style="font-size:11px; color:var(--nw-text-muted);">
+        {% if most_recent %}{{ most_recent.timestamp|date:"d M Y H:i" }} UTC{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="get" class="filter-bar">
+  <div class="filter-group">
+    <label class="filter-label">IP Address</label>
+    <input type="text" name="ip_address" value="{{ ip_address }}" class="filter-input" placeholder="e.g. 192.168.1.10" />
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">From Date</label>
+    <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">To Date</label>
+    <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
+  </div>
+  <button type="submit" class="filter-btn filter-btn-primary">
+    <i class="bi bi-funnel-fill"></i> Apply
+  </button>
+  <a href="{% url 'rate_limit_history' %}" class="filter-btn filter-btn-ghost">
+    <i class="bi bi-x-lg"></i> Clear
+  </a>
+</form>
+
+<div class="nw-card" style="padding:0; overflow:hidden;">
+  <div class="nw-section-header" style="padding:16px 20px 0;">
+    <div class="nw-section-title">
+      <i class="bi bi-clock-history" style="color:var(--nw-danger);"></i>
+      Violation Log
+    </div>
+    <span style="font-size:12px; color:var(--nw-text-muted);">{{ page_obj.paginator.count }} record{{ page_obj.paginator.count|pluralize }}</span>
+  </div>
+  <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th>IP Address</th>
+          <th>Requests</th>
+          <th>Threshold</th>
+          <th>Window</th>
+          <th>Path</th>
+          <th>Method</th>
+          <th>Detected At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for violation in page_obj %}
+        <tr>
+          <td><span class="nw-ip">{{ violation.ip_address }}</span></td>
+          <td><strong style="color:var(--nw-danger);">{{ violation.request_count }}</strong></td>
+          <td>{{ violation.threshold }} req/min</td>
+          <td>{{ violation.window_minutes }} min</td>
+          <td style="font-family:'Courier New', monospace; font-size:12px; color:var(--nw-text-muted);">{{ violation.path }}</td>
+          <td><span class="nw-badge nw-badge-secondary">{{ violation.request_method }}</span></td>
+          <td><span class="nw-timestamp">{{ violation.timestamp|date:"d M Y H:i" }}</span></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="nw-empty-state">
+              <i class="bi bi-shield-check"></i>
+              <p>No rate-limit violations logged yet.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="padding:16px 20px; border-top:1px solid var(--nw-border); display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-size:12px; color:var(--nw-text-muted);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div class="nw-pagination">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&ip_address={{ ip_address }}&date_from={{ date_from }}&date_to={{ date_to }}" class="nw-page-btn"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <span class="nw-page-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?page={{ num }}&ip_address={{ ip_address }}&date_from={{ date_from }}&date_to={{ date_to }}" class="nw-page-btn">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&ip_address={{ ip_address }}&date_from={{ date_from }}&date_to={{ date_to }}" class="nw-page-btn"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

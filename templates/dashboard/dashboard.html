@@ -1,0 +1,1044 @@
+{% extends 'base.html' %}
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{# dashboard.html — NetWatch Professional Monitoring Dashboard #}
+{# This template EXTENDS base.html and FILLS the {% block content %} slot. #}
+{# ─────────────────────────────────────────────────────────────────────────── #}
+
+{% block title %}Dashboard{% endblock %}
+
+{# Mark the Dashboard link as "active" in the sidebar #}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block page_title %}Security Dashboard{% endblock %}
+{% block page_breadcrumb %}Network Monitoring Dashboard{% endblock %}
+
+{% block content %}
+
+<style>
+  /* Cyber Theme Scrollbar for SOC lists */
+  .col-xl-6 div::-webkit-scrollbar,
+  .col-xl-7 div::-webkit-scrollbar,
+  .col-xl-5 div::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .col-xl-6 div::-webkit-scrollbar-track,
+  .col-xl-7 div::-webkit-scrollbar-track,
+  .col-xl-5 div::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .col-xl-6 div::-webkit-scrollbar-thumb,
+  .col-xl-7 div::-webkit-scrollbar-thumb,
+  .col-xl-5 div::-webkit-scrollbar-thumb {
+    background: var(--nw-border);
+    border-radius: 4px;
+  }
+  .col-xl-6 div::-webkit-scrollbar-thumb:hover,
+  .col-xl-7 div::-webkit-scrollbar-thumb:hover,
+  .col-xl-5 div::-webkit-scrollbar-thumb:hover {
+    background: var(--nw-text-muted);
+  }
+
+  /* Micro-animations and SOC dashboard enhancements */
+  .nw-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  
+  .nw-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  /* Status Badge enhancements */
+  .nw-badge {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  }
+
+  /* Glow styles for active alerts and status banners */
+  .border-glow-danger {
+    border-color: rgba(220, 38, 38, 0.45) !important;
+    box-shadow: 0 0 15px rgba(220, 38, 38, 0.1) !important;
+  }
+
+  .border-glow-warning {
+    border-color: rgba(217, 119, 6, 0.45) !important;
+    box-shadow: 0 0 15px rgba(217, 119, 6, 0.1) !important;
+  }
+
+  .border-glow-success {
+    border-color: rgba(22, 163, 74, 0.35) !important;
+    box-shadow: 0 0 15px rgba(22, 163, 74, 0.05) !important;
+  }
+
+  /* Pulse animation for active alerts */
+  @keyframes alert-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.02); opacity: 0.95; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .pulse-active {
+    animation: alert-pulse 1.8s infinite ease-in-out;
+  }
+
+  /* Fade-in for timeline elements */
+  @keyframes nw-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  #activity-feed-container > div {
+    animation: nw-fade-in 0.3s ease-out forwards;
+  }
+
+  /* Tables padding and typography enhancements */
+  .nw-table th {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .nw-table td {
+    padding: 12px 20px;
+  }
+</style>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+
+
+
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
+      Network Monitoring Overview
+    </h1>
+    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
+      Traffic activity monitoring and threat detection
+    </p>
+  </div>
+
+  {# ── System Status Indicator ────────────────────────────────────────────── #}
+  {# The system_status dict has two keys: #}
+  {# .label → "Operational" or "Idle" #}
+  {# .css → "success" or "warning" (controls dot animation color) #}
+  <div id="nw-system-status-banner"
+    style="display:flex; align-items:center; gap:10px; background:var(--nw-bg-card); border:1px solid var(--nw-border); border-radius:10px; padding:10px 18px;">
+    <span id="nw-system-status-dot" class="nw-status-dot {{ system_status.css }}"></span>
+    <div>
+      <div style="font-size:12px; color:var(--nw-text-muted); line-height:1;">Engine Status</div>
+      <div id="nw-system-status-label"
+        style="font-size:14px; font-weight:600; color:{% if system_status.css == 'success' %}var(--nw-success){% else %}var(--nw-warning){% endif %}; margin-top:2px;">
+        {{ system_status.label }}
+      </div>
+    </div>
+    <div style="width:1px; height:30px; background:var(--nw-border); margin:0 4px;"></div>
+    <div>
+      <div style="font-size:12px; color:var(--nw-text-muted); line-height:1;">Network Health</div>
+      <div id="nw-network-health-label" style="font-size:14px; font-weight:700; margin-top:2px; display: flex; align-items: center; gap: 5px;">
+        <span class="spinner-border spinner-border-sm text-secondary" style="width: 12px; height: 12px;"></span>
+      </div>
+    </div>
+    <div style="width:1px; height:30px; background:var(--nw-border); margin:0 4px;"></div>
+    <div>
+      {# Show the logged-in user's role next to the system status #}
+      <div style="font-size:12px; color:var(--nw-text-muted); line-height:1;">Logged In As</div>
+      <div style="font-size:14px; font-weight:600; color:var(--nw-accent); margin-top:2px;">
+        {{ request.user.username }}
+        <span style="color:var(--nw-text-muted); font-weight:400; font-size:12px;">
+          &nbsp;·&nbsp;
+          {{ user_role|default:"User"|title }}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Dynamic Health Alert Banner ────────────────────────────────────────── #}
+<div id="nw-health-alert-banner" class="mb-4" style="display: none;">
+  <div class="alert alert-dismissible fade show border-0 d-flex align-items-center gap-3" role="alert" id="nw-health-alert-content" style="border-radius: 12px; padding: 16px 20px;">
+    <i class="" id="nw-health-alert-icon" style="font-size: 24px;"></i>
+    <div class="flex-grow-1">
+      <strong id="nw-health-alert-title" style="font-size: 15px;"></strong>
+      <div id="nw-health-alert-desc" style="font-size: 13px; margin-top: 2px;"></div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="top: auto; padding: 1.25rem;"></button>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 2 — KPI Cards Row #}
+{# Four Key Performance Indicators arranged in a responsive 4-column grid. #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+
+<div class="row g-3 mb-4">
+
+  {# ── KPI Card 1: Total Requests ──────────────────────────────────────── #}
+  {# Cybersecurity relevance: Tracks overall traffic volume. A sudden spike #}
+  {# compared to historical baseline is a strong DDoS indicator. #}
+  <div class="col-xl-3 col-md-6">
+    <div class="nw-card">
+      <div class="nw-kpi-icon icon-blue">
+        <i class="bi bi-activity"></i>
+      </div>
+      <div class="nw-kpi-value" id="kpi-total-requests">
+        {{ total_requests|default:"0" }}
+      </div>
+      <div class="nw-kpi-label">Total Requests</div>
+      <div style="margin-top:10px; font-size:11px; color:var(--nw-text-muted);">
+        <i class="bi bi-database" style="color:var(--nw-accent);"></i>
+        All-time traffic recorded
+      </div>
+    </div>
+  </div>
+
+  {# ── KPI Card 2: Requests Today ──────────────────────────────────────── #}
+  {# Cybersecurity relevance: Today's volume vs. yesterday's is a quick way #}
+  {# to spot an ongoing attack without querying the full log history. #}
+  <div class="col-xl-3 col-md-6">
+    <div class="nw-card">
+      <div class="nw-kpi-icon icon-green">
+        <i class="bi bi-calendar-check-fill"></i>
+      </div>
+      <div class="nw-kpi-value" id="kpi-today-requests">{{ today_requests|default:"0" }}</div>
+      <div class="nw-kpi-label">Requests Today</div>
+      <div style="margin-top:10px; font-size:11px; color:var(--nw-text-muted);">
+        <i class="bi bi-clock" style="color:var(--nw-success);"></i>
+        Since midnight (00:00)
+      </div>
+    </div>
+  </div>
+
+  {# ── KPI Card 3: Unique IP Addresses ─────────────────────────────────── #}
+  {# Cybersecurity relevance: Low unique IP count + high request count is #}
+  {# a classic sign of a single-source DDoS. Many IPs = botnet DDoS. #}
+  <div class="col-xl-3 col-md-6">
+    <div class="nw-card">
+      <div class="nw-kpi-icon icon-cyan">
+        <i class="bi bi-globe2"></i>
+      </div>
+      <div class="nw-kpi-value" id="kpi-unique-ips">{{ unique_ips|default:"0" }}</div>
+      <div class="nw-kpi-label">Unique IP Addresses</div>
+      <div style="margin-top:10px; font-size:11px; color:var(--nw-text-muted);">
+        <i class="bi bi-diagram-3" style="color:var(--nw-info);"></i>
+        Distinct source addresses
+      </div>
+    </div>
+  </div>
+
+  {# ── KPI Card 4: Active DDoS Alerts ──────────────────────────────────── #}
+  {# Cybersecurity relevance: The most critical metric. If this is non-zero, #}
+  {# the system has detected an active threat that requires attention. #}
+  <div class="col-xl-3 col-md-6">
+    <div class="nw-card" id="kpi-active-alerts-card"
+      style="{% if active_alerts > 0 %}border-color:rgba(239,68,68,0.3);{% endif %}">
+
+      {# If alerts are active, add a subtle red glow to the card #}
+      <div id="kpi-active-alerts-glow"
+        style="position:absolute; inset:0; background:radial-gradient(circle at top right, rgba(239,68,68,0.08), transparent 60%); border-radius:14px; pointer-events:none;{% if active_alerts <= 0 %} display:none;{% endif %}">
+      </div>
+
+      <div class="nw-kpi-icon icon-red">
+        <i class="bi bi-shield-exclamation"></i>
+      </div>
+      <div class="nw-kpi-value" id="kpi-active-alerts"
+        style="{% if active_alerts > 0 %}color:var(--nw-danger); {% endif %}">
+        {{ active_alerts|default:"0" }}
+      </div>
+      <div class="nw-kpi-label">Active DDoS Alerts</div>
+      <div style="margin-top:10px; font-size:11px;" id="kpi-active-alerts-footer">
+        {% if active_alerts > 0 %}
+        {# Pulsing red dot + urgent message when alerts are active #}
+        <span class="nw-status-dot danger"
+          style="background:var(--nw-danger); animation:nw-pulse-green 1s infinite; margin-right:4px;"></span>
+        <span style="color:var(--nw-danger); font-weight:600;">Threats detected — act now</span>
+        {% else %}
+        <i class="bi bi-check-circle" style="color:var(--nw-success);"></i>
+        <span style="color:var(--nw-text-muted);">No active threats</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{# END KPI ROW #}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 2.5 — Recent Traffic Statistics & Top Source IP Widget #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+  {# Recent Traffic Statistics #}
+  <div class="col-xl-6">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-speedometer" style="color:var(--nw-accent);"></i>
+          Recent Traffic Statistics
+        </div>
+        <span class="nw-badge nw-badge-info" id="live-rate-count">0 req/min</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+      <div style="overflow-x:auto; min-height: 220px; max-height: 380px; overflow-y: auto;">
+        <table class="nw-table">
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th>Requests per Minute</th>
+              <th>Status</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody id="live-request-rate-body">
+            <tr>
+              <td colspan="4">
+                <div class="nw-empty-state" style="padding: 40px 0;">
+                  <div class="spinner-border text-primary spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+                  <p style="margin:8px 0 0; font-size:13px;">Initializing Recent Traffic Statistics...</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# Top Source IP Widget #}
+  <div class="col-xl-6" id="top-source-ip-widget-container">
+    <div class="nw-card" style="padding:0; overflow:hidden; height: 100%;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-bar-chart-steps" style="color:var(--nw-info);"></i>
+          Top Source IP Widget
+        </div>
+        <span class="nw-badge nw-badge-info">Top 10 active sources</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+      <div style="padding: 20px; max-height: 380px; overflow-y: auto;" id="top-source-ip-widget-body">
+        <div class="nw-empty-state" style="padding: 40px 0;">
+          <div class="spinner-border text-info spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+          <p style="margin:8px 0 0; font-size:13px;">Initializing Top Source IP data...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 3 — Recent Traffic + Recent Alerts (Two-Column Layout) #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+
+<div class="row g-3">
+
+  {# ── Left Column: Recent Traffic Activity Table ──────────────────────── #}
+  {# Shows the last 10 HTTP requests logged by the middleware. #}
+  {# Purpose: Gives the admin traffic monitoring forensic visibility. #}
+  <div class="col-xl-7">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-list-ul" style="color:var(--nw-accent);"></i>
+          Recent Traffic Activity
+        </div>
+        <span class="nw-badge nw-badge-info">Last 10 Requests</span>
+      </div>
+
+      {# Horizontal divider between header and table #}
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+      {# ── Traffic Table ────────────────────────────────────────────────── #}
+      <div style="overflow-x:auto;">
+        <table class="nw-table">
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th>Method</th>
+              <th>URL Accessed</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="recent-traffic-body">
+            {% for log in recent_traffic %}
+            <tr>
+
+              {# IP Address — monospace cyan styling for easy reading #}
+              <td>
+                <a href="{% url 'ip_investigation' %}?ip={{ log.ip_address }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">{{ log.ip_address }}</a>
+              </td>
+
+              {# HTTP Method — color-coded badge (GET=green, POST=blue) #}
+              <td>
+                {% if log.request_method == 'GET' %}
+                <span class="nw-method nw-method-get">GET</span>
+                {% elif log.request_method == 'POST' %}
+                <span class="nw-method nw-method-post">POST</span>
+                {% else %}
+                <span class="nw-method nw-method-other">{{ log.request_method }}</span>
+                {% endif %}
+              </td>
+
+              {# URL — truncated to prevent overflow on narrow screens #}
+              <td>
+                <span class="nw-url" title="{{ log.url_accessed }}">
+                  {{ log.url_accessed }}
+                </span>
+              </td>
+
+              {# Timestamp — formatted as HH:MM:SS DD Mon YYYY #}
+              <td>
+                <span class="nw-timestamp">
+                  {# Django's date filter formats the timestamp field. #}
+                  {# "H:i:s d M Y" → "14:32:05 25 Jun 2025" #}
+                  {{ log.timestamp|date:"H:i:s d M Y" }}
+                </span>
+              </td>
+
+            </tr>
+            {% empty %}
+            {# Shown when the queryset is empty (no traffic logged yet) #}
+            <tr>
+              <td colspan="4">
+                <div class="nw-empty-state">
+                  <i class="bi bi-inbox"></i>
+                  <p style="margin:0; font-size:13px;">No traffic logged yet.</p>
+                  <p style="margin:4px 0 0; font-size:12px;">
+                    Navigate through the site to generate traffic records.
+                  </p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+
+          </tbody>
+        </table>
+      </div>
+      {# END Traffic Table #}
+
+    </div>
+  </div>
+  {# END Left Column #}
+
+  {# ── Right Column: Recent Alerts Table ───────────────────────────────── #}
+  {# Shows the 5 most recent alerts generated by the DDoS detector. #}
+  {# Purpose: Enables rapid incident response triage. #}
+  <div class="col-xl-5">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
+          Recent Alerts
+        </div>
+        {# Dynamic badge: red if active alerts exist, gray if all clear #}
+        <span id="recent-alerts-badge">
+          {% if active_alerts > 0 %}
+          <span class="nw-badge nw-badge-danger">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            {{ active_alerts }} Active
+          </span>
+          {% else %}
+          <span class="nw-badge nw-badge-success">
+            <i class="bi bi-check-circle-fill"></i>
+            All Clear
+          </span>
+          {% endif %}
+        </span>
+      </div>
+
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+
+      {# ── Alerts Table ─────────────────────────────────────────────────── #}
+      <div style="overflow-x:auto;">
+        <table class="nw-table">
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="recent-alerts-body">
+            {% for alert in recent_alerts %}
+            <tr>
+              <td>
+                <a href="{% url 'ip_investigation' %}?ip={{ alert.ip_address }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">{{ alert.ip_address }}</a>
+                <div style="font-size:11px; color:var(--nw-text-muted); margin-top:2px;">
+                  {{ alert.request_count }} req/min
+                </div>
+              </td>
+
+              {# Severity Badge — uses the severity_badge property from the model #}
+              <td>
+                {% if alert.severity == 'critical' %}
+                <span class="nw-badge nw-badge-danger">
+                  <i class="bi bi-exclamation-octagon-fill"></i>
+                  Critical
+                </span>
+                {% elif alert.severity == 'high' %}
+                <span class="nw-badge nw-badge-orange">
+                  <i class="bi bi-exclamation-triangle-fill"></i>
+                  High
+                </span>
+                {% elif alert.severity == 'medium' %}
+                <span class="nw-badge nw-badge-warning">
+                  <i class="bi bi-dash-circle-fill"></i>
+                  Medium
+                </span>
+                {% else %}
+                <span class="nw-badge nw-badge-info">
+                  <i class="bi bi-info-circle-fill"></i>
+                  Low
+                </span>
+                {% endif %}
+              </td>
+
+              {# Resolved Status Badge #}
+              <td>
+                {% if alert.resolved %}
+                <span class="nw-badge nw-badge-success">
+                  <i class="bi bi-check-circle-fill"></i>
+                  Resolved
+                </span>
+                {% else %}
+                <span class="nw-badge nw-badge-danger">
+                  <i class="bi bi-dot"></i>
+                  Active
+                </span>
+                {% endif %}
+              </td>
+
+              {# Time the alert was created #}
+              <td>
+                <span class="nw-timestamp">
+                  {{ alert.timestamp|date:"H:i d/m" }}
+                </span>
+              </td>
+
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4">
+                <div class="nw-empty-state">
+                  <i class="bi bi-shield-check" style="color:var(--nw-success); opacity:0.6;"></i>
+                  <p style="margin:0; font-size:13px; color:var(--nw-success);">No alerts detected.</p>
+                  <p style="margin:4px 0 0; font-size:12px; color:var(--nw-text-muted);">
+                    The system is monitoring for threats.
+                  </p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+
+          </tbody>
+        </table>
+      </div>
+      {# END Alerts Table #}
+
+    </div>
+  </div>
+  {# END Right Column #}
+
+</div>
+{# END SECTION 3 ROW #}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 4 — Recent SOC Timeline #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mt-1 mb-4">
+  <div class="col-12">
+    <div class="nw-card" style="padding:0; overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 0;">
+        <div class="nw-section-title">
+          <i class="bi bi-clock-history" style="color:var(--nw-accent);"></i>
+          Recent SOC Timeline
+        </div>
+        <span class="nw-badge nw-badge-info">Latest Network Activity</span>
+      </div>
+      <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
+      <div style="padding: 20px 24px; max-height: 400px; overflow-y: auto;">
+        <div id="activity-feed-container" class="position-relative" style="min-height: 120px;">
+          <div class="nw-empty-state" style="padding: 40px 0;">
+            <div class="spinner-border text-primary spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+            <p style="margin:8px 0 0; font-size:13px;">Initializing Recent SOC Timeline...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 4 — Quick Info Footer Strip #}
+{# Provides context about what the system is doing, reassuring the user. #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="nw-card"
+      style="background:linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06)); border-color:rgba(59,130,246,0.15);">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-cpu-fill" style="color:var(--nw-accent); font-size:18px;"></i>
+          <div>
+            <div style="font-size:11px; color:var(--nw-text-muted);">Detection Engine</div>
+            <div style="font-size:13px; font-weight:600; color:var(--nw-text-primary);">
+              Threshold-Based &bull; 5 req/min
+            </div>
+          </div>
+        </div>
+
+        <div style="width:1px; height:36px; background:var(--nw-border);"></div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-database-fill" style="color:var(--nw-info); font-size:18px;"></i>
+          <div>
+            <div style="font-size:11px; color:var(--nw-text-muted);">Storage</div>
+            <div style="font-size:13px; font-weight:600; color:var(--nw-text-primary);">
+              SQLite &bull; Django ORM
+            </div>
+          </div>
+        </div>
+
+        <div style="width:1px; height:36px; background:var(--nw-border);"></div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-shield-lock-fill" style="color:var(--nw-success); font-size:18px;"></i>
+          <div>
+            <div style="font-size:11px; color:var(--nw-text-muted);">Authentication</div>
+            <div style="font-size:13px; font-weight:600; color:var(--nw-text-primary);">
+              Django Auth &bull; Role-Based
+            </div>
+          </div>
+        </div>
+
+        <div style="width:1px; height:36px; background:var(--nw-border);"></div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-clock-history" style="color:var(--nw-warning); font-size:18px;"></i>
+          <div>
+            <div style="font-size:11px; color:var(--nw-text-muted);">Detection Window</div>
+            <div style="font-size:13px; font-weight:600; color:var(--nw-text-primary);">
+              1-minute rolling window
+            </div>
+          </div>
+        </div>
+
+        {# Auto-refresh notice #}
+        <div class="ms-auto" style="text-align:right;">
+          <div style="font-size:11px; color:var(--nw-text-muted);">Last Updated</div>
+          <div style="font-size:13px; font-weight:500; color:var(--nw-text-primary);" id="nw-load-time">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{# END CONTENT BLOCK #}
+
+
+{% block extra_js %}
+<script>
+  (function () {
+    const DASHBOARD_POLL_MS = 5000;
+    const DATA_URL = "{{ dashboard_data_url }}";
+    const RECENT_STATS_URL = "{{ recent_stats_url }}";
+
+    const loadTimeEl = document.getElementById('nw-load-time');
+
+    function updateTimestamp() {
+      if (!loadTimeEl) return;
+      loadTimeEl.textContent = new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    }
+
+    function methodBadge(method) {
+      if (method === 'GET') {
+        return '<span class="nw-method nw-method-get">GET</span>';
+      }
+      if (method === 'POST') {
+        return '<span class="nw-method nw-method-post">POST</span>';
+      }
+      return `<span class="nw-method nw-method-other">${method}</span>`;
+    }
+
+    function severityBadge(severity) {
+      const badges = {
+        critical: '<span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-octagon-fill"></i> Critical</span>',
+        high: '<span class="nw-badge nw-badge-orange"><i class="bi bi-exclamation-triangle-fill"></i> High</span>',
+        medium: '<span class="nw-badge nw-badge-warning"><i class="bi bi-dash-circle-fill"></i> Medium</span>',
+        low: '<span class="nw-badge nw-badge-info"><i class="bi bi-info-circle-fill"></i> Low</span>',
+      };
+      return badges[severity] || badges.low;
+    }
+
+    function statusBadge(status) {
+      const badges = {
+        normal: '<span class="nw-badge nw-badge-success"><i class="bi bi-shield-check"></i> Normal</span>',
+        alert: '<span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-octagon-fill"></i> Alerting</span>',
+        rate_limit: '<span class="nw-badge nw-badge-warning"><i class="bi bi-speedometer2"></i> Rate-Limited</span>',
+        blocked: '<span class="nw-badge nw-badge-secondary"><i class="bi bi-slash-circle"></i> Blocked</span>',
+      };
+      return badges[status] || '<span class="nw-badge nw-badge-secondary">Unknown</span>';
+    }
+
+    function renderTrafficRows(rows) {
+      if (!rows.length) {
+        return `<tr>
+        <td colspan="4">
+          <div class="nw-empty-state">
+            <i class="bi bi-inbox"></i>
+            <p style="margin:0; font-size:13px;">No traffic logged yet.</p>
+            <p style="margin:4px 0 0; font-size:12px;">Navigate through the site to generate traffic records.</p>
+          </div>
+        </td>
+      </tr>`;
+      }
+
+      return rows.map(function (log) {
+        return `<tr>
+        <td><a href="/alerts/investigate/?ip=${log.ip_address}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">${log.ip_address}</a></td>
+        <td>${methodBadge(log.request_method)}</td>
+        <td><span class="nw-url" title="${log.url_accessed}">${log.url_accessed}</span></td>
+        <td><span class="nw-timestamp">${log.timestamp}</span></td>
+      </tr>`;
+      }).join('');
+    }
+
+    function renderAlertRows(rows) {
+      if (!rows.length) {
+        return `<tr>
+        <td colspan="4">
+          <div class="nw-empty-state">
+            <i class="bi bi-shield-check" style="color:var(--nw-success); opacity:0.6;"></i>
+            <p style="margin:0; font-size:13px; color:var(--nw-success);">No alerts detected.</p>
+            <p style="margin:4px 0 0; font-size:12px; color:var(--nw-text-muted);">The system is monitoring for threats.</p>
+          </div>
+        </td>
+      </tr>`;
+      }
+
+      return rows.map(function (alert) {
+        const statusBadge = alert.resolved
+          ? '<span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill"></i> Resolved</span>'
+          : '<span class="nw-badge nw-badge-danger"><i class="bi bi-dot"></i> Active</span>';
+
+        return `<tr>
+        <td>
+          <a href="/alerts/investigate/?ip=${alert.ip_address}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">${alert.ip_address}</a>
+          <div style="font-size:11px; color:var(--nw-text-muted); margin-top:2px;">${alert.request_count} req/min</div>
+        </td>
+        <td>${severityBadge(alert.severity)}</td>
+        <td>${statusBadge}</td>
+        <td><span class="nw-timestamp">${alert.timestamp}</span></td>
+      </tr>`;
+      }).join('');
+    }
+
+    function renderRecentRateRows(topIps, updateTime) {
+      if (!topIps || !topIps.length) {
+        return `<tr>
+          <td colspan="4">
+            <div class="nw-empty-state" style="padding: 40px 0;">
+              <i class="bi bi-inbox" style="font-size: 24px; color: var(--nw-text-muted);"></i>
+              <p style="margin:8px 0 0; font-size:13px;">No active traffic in the last 60 seconds.</p>
+            </div>
+          </td>
+        </tr>`;
+      }
+
+      return topIps.map(function (item) {
+        return `<tr>
+          <td><a href="/alerts/investigate/?ip=${item.ip}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">${item.ip}</a></td>
+          <td><span class="fw-semibold">${item.count} rpm</span></td>
+          <td>${statusBadge(item.status)}</td>
+          <td><span class="nw-timestamp text-muted">${updateTime}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function riskBadge(risk) {
+      const badges = {
+        low: '<span class="nw-badge nw-badge-success" style="font-size:10px; padding:2px 6px;">Low Risk</span>',
+        medium: '<span class="nw-badge nw-badge-warning" style="font-size:10px; padding:2px 6px;">Med Risk</span>',
+        high: '<span class="nw-badge nw-badge-orange" style="font-size:10px; padding:2px 6px;">High Risk</span>',
+        critical: '<span class="nw-badge nw-badge-danger" style="font-size:10px; padding:2px 6px;">Critical Risk</span>',
+      };
+      return badges[risk] || '<span class="nw-badge nw-badge-secondary" style="font-size:10px; padding:2px 6px;">Unknown</span>';
+    }
+
+    function renderTopIpWidget(topIps) {
+      if (!topIps || !topIps.length) {
+        return `<div class="nw-empty-state" style="padding: 40px 0;">
+          <i class="bi bi-inbox" style="font-size: 24px; color: var(--nw-text-muted);"></i>
+          <p style="margin:8px 0 0; font-size:13px;">No active traffic in the last 60 seconds.</p>
+        </div>`;
+      }
+
+      return topIps.map(function (item) {
+        let progressClass = 'bg-primary';
+        if (item.risk === 'critical') progressClass = 'bg-danger';
+        else if (item.risk === 'high') progressClass = 'bg-warning'; 
+        else if (item.risk === 'medium') progressClass = 'bg-warning text-dark';
+
+        return `<div class="mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <a href="/alerts/investigate/?ip=${item.ip}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">${item.ip}</a>
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-muted" style="font-size:12px;">${item.count} req (${item.pct_total}%)</span>
+              ${riskBadge(item.risk)}
+            </div>
+          </div>
+          <div class="progress" style="height: 6px; background-color: var(--nw-border); border-radius: 3px;">
+            <div class="progress-bar ${progressClass}" role="progressbar" style="width: ${item.pct}%; border-radius: 3px;" aria-valuenow="${item.pct}" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function updateSystemStatus(status) {
+      const dot = document.getElementById('nw-system-status-dot');
+      const label = document.getElementById('nw-system-status-label');
+      if (!dot || !label) return;
+
+      dot.className = 'nw-status-dot ' + status.css;
+      label.textContent = status.label;
+      label.style.color = status.css === 'success' ? 'var(--nw-success)' : 'var(--nw-warning)';
+    }
+
+    function updateActiveAlertsUI(count) {
+      const card = document.getElementById('kpi-active-alerts-card');
+      const glow = document.getElementById('kpi-active-alerts-glow');
+      const value = document.getElementById('kpi-active-alerts');
+      const footer = document.getElementById('kpi-active-alerts-footer');
+      const badge = document.getElementById('recent-alerts-badge');
+
+      if (card) {
+        if (count > 0) {
+          card.classList.add('border-glow-danger');
+          card.classList.add('pulse-active');
+        } else {
+          card.classList.remove('border-glow-danger');
+          card.classList.remove('pulse-active');
+        }
+      }
+      if (glow) {
+        glow.style.display = count > 0 ? 'block' : 'none';
+      }
+      if (value) {
+        value.textContent = count;
+        value.style.color = count > 0 ? 'var(--nw-danger)' : '';
+      }
+      if (footer) {
+        footer.innerHTML = count > 0
+          ? '<span class="nw-status-dot danger" style="background:var(--nw-danger); animation:nw-pulse-green 1s infinite; margin-right:4px;"></span><span style="color:var(--nw-danger); font-weight:600;">Threats detected — act now</span>'
+          : '<i class="bi bi-check-circle" style="color:var(--nw-success);"></i><span style="color:var(--nw-text-muted);">No active threats</span>';
+      }
+      if (badge) {
+        badge.innerHTML = count > 0
+          ? `<span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-circle-fill"></i> ${count} Active</span>`
+          : '<span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill"></i> All Clear</span>';
+      }
+
+      const navBadge = document.querySelector('.nw-nav-badge');
+      if (navBadge) {
+        if (count > 0) {
+          navBadge.textContent = count;
+          navBadge.style.display = '';
+        } else {
+          navBadge.style.display = 'none';
+        }
+      }
+    }
+
+    function renderActivityFeed(feed) {
+      if (!feed || !feed.length) {
+        return `<div class="nw-empty-state" style="padding: 40px 0;">
+          <i class="bi bi-inbox" style="font-size: 24px; color: var(--nw-text-muted);"></i>
+          <p style="margin:8px 0 0; font-size:13px;">No activities recorded yet.</p>
+        </div>`;
+      }
+
+      let html = `<div style="position: absolute; left: 19px; top: 10px; bottom: 10px; width: 2px; background-color: var(--nw-border); z-index: 1;"></div>`;
+      
+      html += feed.map(function (item) {
+        let iconBg = 'rgba(59, 130, 246, 0.1)';
+        let iconColor = 'var(--nw-accent)';
+        if (item.css === 'danger') {
+          iconBg = 'rgba(239, 68, 68, 0.1)';
+          iconColor = 'var(--nw-danger)';
+        } else if (item.css === 'warning') {
+          iconBg = 'rgba(245, 158, 11, 0.1)';
+          iconColor = 'var(--nw-warning)';
+        } else if (item.css === 'success') {
+          iconBg = 'rgba(34, 197, 94, 0.1)';
+          iconColor = 'var(--nw-success)';
+        } else if (item.css === 'secondary') {
+          iconBg = 'rgba(100, 116, 139, 0.1)';
+          iconColor = 'var(--nw-text-muted)';
+        }
+
+        return `<div class="d-flex align-items-start mb-4 position-relative" style="z-index: 2;">
+          <div class="d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 50%; background-color: ${iconBg}; color: ${iconColor}; border: 4px solid var(--nw-bg-card); flex-shrink: 0; font-size: 16px;">
+            <i class="bi ${item.icon}"></i>
+          </div>
+          <div class="ms-3 flex-grow-1" style="padding-top: 4px;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <span class="fw-semibold text-dark" style="font-size: 14px;">${item.message}</span>
+              <span class="text-muted" style="font-size: 11px;">
+                <i class="bi bi-clock-history"></i> ${item.timestamp}
+              </span>
+            </div>
+            <div style="font-size: 12px; color: var(--nw-text-muted); margin-top: 2px;">
+              Source IP: <a href="/alerts/investigate/?ip=${item.ip}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent); font-size: 11px;">${item.ip}</a>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      return html;
+    }
+
+    function applyDashboardData(data) {
+      const totalEl = document.getElementById('kpi-total-requests');
+      const todayEl = document.getElementById('kpi-today-requests');
+      const uniqueEl = document.getElementById('kpi-unique-ips');
+      const trafficBody = document.getElementById('recent-traffic-body');
+      const alertsBody = document.getElementById('recent-alerts-body');
+      const feedContainer = document.getElementById('activity-feed-container');
+
+      if (totalEl) totalEl.textContent = data.total_requests;
+      if (todayEl) todayEl.textContent = data.today_requests;
+      if (uniqueEl) uniqueEl.textContent = data.unique_ips;
+
+      updateSystemStatus(data.system_status);
+      updateActiveAlertsUI(data.active_alerts);
+
+      if (trafficBody) {
+        trafficBody.innerHTML = renderTrafficRows(data.recent_traffic);
+      }
+      if (alertsBody) {
+        alertsBody.innerHTML = renderAlertRows(data.recent_alerts);
+      }
+      if (feedContainer) {
+        feedContainer.innerHTML = renderActivityFeed(data.activity_feed);
+      }
+
+      updateTimestamp();
+    }
+
+    function updateNetworkHealth(health) {
+      const healthLabel = document.getElementById('nw-network-health-label');
+      const alertBanner = document.getElementById('nw-health-alert-banner');
+      const alertContent = document.getElementById('nw-health-alert-content');
+      const alertIcon = document.getElementById('nw-health-alert-icon');
+      const alertTitle = document.getElementById('nw-health-alert-title');
+      const alertDesc = document.getElementById('nw-health-alert-desc');
+      const banner = document.getElementById('nw-system-status-banner');
+
+      if (healthLabel) {
+        healthLabel.style.color = health.color;
+        healthLabel.innerHTML = `<i class="bi ${health.icon}"></i> ${health.label}`;
+      }
+
+      if (banner) {
+        banner.classList.remove('border-glow-success', 'border-glow-warning', 'border-glow-danger');
+        if (health.level === 'normal') {
+          banner.classList.add('border-glow-success');
+        } else if (health.level === 'moderate') {
+          banner.classList.add('border-glow-warning');
+        } else {
+          banner.classList.add('border-glow-danger');
+        }
+      }
+
+      if (alertBanner && alertContent && alertIcon && alertTitle && alertDesc) {
+        if (health.level === 'normal') {
+          alertBanner.style.display = 'none';
+        } else {
+          alertBanner.style.display = 'block';
+          alertContent.style.backgroundColor = health.bg;
+          alertContent.style.border = `1px solid ${health.border}`;
+          alertContent.style.color = health.color;
+          alertIcon.className = `bi ${health.icon}`;
+          alertTitle.textContent = `System Threat Level: ${health.label.toUpperCase()}`;
+          alertDesc.textContent = health.message;
+        }
+      }
+    }
+
+    function applyRecentStatsData(data) {
+      const liveRateCount = document.getElementById('live-rate-count');
+      const liveRateBody = document.getElementById('live-request-rate-body');
+      const topIpBody = document.getElementById('top-source-ip-widget-body');
+
+      const currentTime = new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      if (liveRateCount) {
+        liveRateCount.textContent = `${data.req_per_min} req/min`;
+      }
+      if (liveRateBody) {
+        liveRateBody.innerHTML = renderRecentRateRows(data.top_ips, currentTime);
+      }
+      if (topIpBody) {
+        topIpBody.innerHTML = renderTopIpWidget(data.top_ips);
+      }
+
+      updateNetworkHealth(data.health);
+    }
+
+    function refreshDashboard() {
+      // 1. Fetch Core Dashboard KPIs & Recent Logs
+      fetch(DATA_URL, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Dashboard core data request failed');
+          return response.json();
+        })
+        .then(applyDashboardData)
+        .catch(function (err) {
+          console.error('Dashboard core refresh failed:', err);
+        });
+
+      // 2. Fetch Recent Traffic Stats & Traffic Health
+      fetch(RECENT_STATS_URL, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Dashboard recent stats request failed');
+          return response.json();
+        })
+        .then(applyRecentStatsData)
+        .catch(function (err) {
+          console.error('Dashboard recent stats refresh failed:', err);
+        });
+    }
+
+    updateTimestamp();
+    refreshDashboard();
+    setInterval(refreshDashboard, DASHBOARD_POLL_MS);
+  })();
+</script>
+{% endblock %}
