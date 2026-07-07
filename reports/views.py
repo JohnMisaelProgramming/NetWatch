@@ -292,12 +292,15 @@ def _build_pdf_header(elements, styles, title, subtitle):
     """
     Helper: appends a styled header block to a reportlab elements list.
     Centralizes PDF branding so both traffic and alert PDFs look consistent.
+    Includes the NetWatch logo image for professional output.
     """
-    from reportlab.platypus import Paragraph, Spacer, HRFlowable
+    from reportlab.platypus import Paragraph, Spacer, HRFlowable, Image, Table, TableStyle
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.units import inch
     from reportlab.lib.enums import TA_LEFT
+    import os
+    from django.conf import settings as django_settings
 
     title_style = ParagraphStyle(
         'NwTitle',
@@ -315,7 +318,16 @@ def _build_pdf_header(elements, styles, title, subtitle):
         spaceAfter=2,
     )
 
-    elements.append(Paragraph('🛡 NetWatch Security System', title_style))
+    # Try to embed the actual NetWatch logo image
+    logo_path = os.path.join(django_settings.BASE_DIR, 'static', 'images', 'netwatch_logo_full.png')
+    if os.path.exists(logo_path):
+        logo_img = Image(logo_path, width=2.5*inch, height=0.75*inch)
+        logo_img.hAlign = 'LEFT'
+        elements.append(logo_img)
+        elements.append(Spacer(1, 0.1 * inch))
+    else:
+        elements.append(Paragraph('NetWatch Security System', title_style))
+
     elements.append(Paragraph(title, ParagraphStyle(
         'NwTitle2', parent=styles['Normal'], fontSize=14,
         fontName='Helvetica-Bold', textColor=colors.HexColor('#1e3a5f'), spaceAfter=4,

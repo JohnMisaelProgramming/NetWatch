@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <!--
   base.html — Master Layout Template for NetWatch
@@ -29,6 +30,10 @@
   <!-- ── Dynamic Page Title ───────────────────────────────────────────── -->
   <!-- Child templates can override the title using the block title tag -->
   <title>{% block title %}NetWatch{% endblock %} | NetWatch Security</title>
+
+  <!-- ── Favicon (NetWatch Logo) ──────────────────────────────────────── -->
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}" />
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}" />
 
   <!-- ── Google Fonts: Inter ──────────────────────────────────────────── -->
   <!-- Inter is a professional, highly-legible sans-serif used in Figma,
@@ -136,18 +141,16 @@
     }
 
     .nw-brand-icon {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--nw-accent), #6366f1);
-      /* Blue-to-indigo gradient icon background */
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      color: white;
+      width: 38px;
+      height: 38px;
       flex-shrink: 0;
-      box-shadow: 0 4px 12px var(--nw-accent-glow);
+    }
+
+    .nw-brand-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
     }
 
     .nw-brand-text {
@@ -705,8 +708,7 @@
     <!-- Brand / Logo -->
     <a href="{% url 'dashboard' %}" class="nw-sidebar-brand">
       <div class="nw-brand-icon">
-        <i class="bi bi-shield-fill-check"></i>
-        <!-- Shield icon — represents security/protection -->
+        <img src="{% static 'images/netwatch_icon.png' %}" alt="NetWatch Logo" />
       </div>
       <div class="nw-brand-text">
         <span class="nw-brand-name">NetWatch</span>
