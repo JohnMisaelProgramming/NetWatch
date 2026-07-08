@@ -33,7 +33,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .models import TrafficLog
+from traffic.models import TrafficLog
 
 logger = logging.getLogger(__name__)
 
@@ -158,3 +158,82 @@ def ingest_traffic(request):
         },
         status=201    # 201 Created — standard HTTP status for resource creation
     )
+
+
+@csrf_exempt
+@require_POST
+def ingest_event(request):
+    """
+    POST /api/events/
+    
+    Receives security events (failed logins, account lockouts, successful logins)
+    from ShopSafe and records them in the NetWatch SecurityEvent database.
+    """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+
+    if not auth_header.startswith('Api-Key '):
+        return JsonResponse(
+            {'error': 'Missing or malformed Authorization header. Expected: Api-Key <key>'},
+            status=403
+        )
+
+    provided_key = auth_header[len('Api-Key '):]
+    expected_key = getattr(settings, 'NETWATCH_API_KEY', None)
+
+    if not expected_key or provided_key != expected_key:
+        logger.warning(
+            "Event Ingest API: rejected request with invalid API key from %s",
+            request.META.get('REMOTE_ADDR', 'unknown')
+        )
+        return JsonResponse(
+            {'error': 'Invalid API key.'},
+            status=403
+        )
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse(
+            {'error': 'Invalid JSON body.'},
+            status=400
+        )
+
+    ip_address = data.get('ip_address', '').strip()
+    event_type = data.get('event_type', '').strip()
+    username = data.get('username', '').strip()
+    details = data.get('details', '').strip()
+    user_agent = data.get('user_agent', '').strip()
+    source = data.get('source', 'external').strip()
+
+    missing_fields = []
+    if not ip_address:
+        missing_fields.append('ip_address')
+    if not event_type:
+        missing_fields.append('event_type')
+
+    if missing_fields:
+        return JsonResponse(
+            {'error': f'Missing required fields: {", ".join(missing_fields)}'},
+            status=400
+        )
+
+    # Create the SecurityEvent record
+    from alerts.models import SecurityEvent
+    SecurityEvent.objects.create(
+        ip_address=ip_address,
+        event_type=event_type,
+        username=username,
+        details=details,
+        user_agent=user_agent,
+        source=source
+    )
+
+    return JsonResponse(
+        {
+            'status': 'ok',
+            'message': 'Security event logged successfully.',
+            'event_type': event_type,
+        },
+        status=201
+    )
+

@@ -92,6 +92,18 @@
       /* Standard transition speed */
     }
 
+    /* ── Dark Mode Design Tokens ─────────────────────────────────────── */
+    [data-theme="dark"] {
+      --nw-bg-page: #0b0f19;
+      --nw-bg-sidebar: #111827;
+      --nw-bg-card: #1f2937;
+      --nw-bg-card-hover: #374151;
+      --nw-border: #374151;
+      --nw-text-primary: #f3f4f6;
+      --nw-text-muted: #9ca3af;
+      --nw-accent-glow: rgba(37, 99, 235, 0.15);
+    }
+
     /* ── Global Reset & Base Styles ──────────────────────────────────── */
     * {
       box-sizing: border-box;
@@ -781,6 +793,11 @@
         Security Validation Lab
       </a>
 
+      <a href="{% url 'audit_log' %}" class="nw-nav-item {% block nav_audit_log %}{% endblock %}">
+        <i class="bi bi-journal-text"></i>
+        Audit Log
+      </a>
+
       <a href="/admin/" class="nw-nav-item" target="_blank">
         <i class="bi bi-gear-fill"></i>
         Django Admin
@@ -794,10 +811,14 @@
     <!-- Sidebar Footer: User Info + Logout -->
     <div class="nw-sidebar-footer">
       <!-- User Info Card -->
-      <div class="nw-user-card mb-2">
-        <!-- Avatar: Shows the first letter of the username -->
-        <div class="nw-avatar">
-          {{ request.user.username|first|upper }}
+      <a href="{% url 'profile' %}" class="nw-user-card mb-2" style="text-decoration:none; display:flex; align-items:center; gap:12px; width:100%;">
+        <!-- Avatar: Shows custom image if uploaded, fallback to first letter of username -->
+        <div class="nw-avatar" style="overflow:hidden; display:flex; align-items:center; justify-content:center;">
+          {% if request.user.profile.avatar %}
+            <img src="{{ request.user.profile.avatar.url }}" alt="Avatar" style="width:100%; height:100%; object-fit:cover;">
+          {% else %}
+            {{ request.user.username|first|upper }}
+          {% endif %}
         </div>
         <div class="nw-user-info">
           <div class="nw-username">{{ request.user.username }}</div>
@@ -805,7 +826,7 @@
             {{ user_role|default:"User"|title }}
           </div>
         </div>
-      </div>
+      </a>
 
       <!-- Logout Button -->
       <form action="{% url 'logout' %}" method="post">
@@ -842,6 +863,13 @@
           style="font-size:12px; color:var(--nw-text-muted); font-family:'Courier New',monospace;">
         </span>
 
+        <!-- Dark Mode Toggle Button -->
+        <button id="nw-dark-mode-toggle" class="btn btn-sm"
+          style="background:var(--nw-bg-card); border:1px solid var(--nw-border); color:var(--nw-text-primary); border-radius:8px; display:flex; align-items:center; justify-content:center; width:34px; height:34px; padding:0;"
+          title="Toggle Dark Mode">
+          <i class="bi bi-moon-fill" id="nw-dark-mode-icon"></i>
+        </button>
+
         {% if is_admin_user or is_analyst_user %}
         <!-- Notification Bell — links to alert management page -->
         <a href="{% url 'alerts_list' %}" class="btn btn-sm"
@@ -860,8 +888,12 @@
         <!-- Logged-in User Label -->
         <div
           style="display:flex; align-items:center; gap:8px; background:var(--nw-bg-card); border:1px solid var(--nw-border); border-radius:8px; padding:6px 12px;">
-          <div class="nw-avatar" style="width:26px; height:26px; font-size:11px;">
-            {{ request.user.username|first|upper }}
+          <div class="nw-avatar" style="width:26px; height:26px; font-size:11px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+            {% if request.user.profile.avatar %}
+              <img src="{{ request.user.profile.avatar.url }}" alt="Avatar" style="width:100%; height:100%; object-fit:cover;">
+            {% else %}
+              {{ request.user.username|first|upper }}
+            {% endif %}
           </div>
           <span style="font-size:13px; font-weight:500; color:var(--nw-text-primary);">
             {{ request.user.username }}
@@ -914,6 +946,34 @@
     }
     updateClock();                      // Run immediately on page load
     setInterval(updateClock, 1000);     // Then update every 1000ms (1 second)
+
+    // ── Dark Mode Logic ──────────────────────────────────────────────
+    const themeToggleBtn = document.getElementById('nw-dark-mode-toggle');
+    const themeIcon = document.getElementById('nw-dark-mode-icon');
+    
+    // Check localStorage or system preference
+    const currentTheme = localStorage.getItem('theme') || 
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    
+    // Set initial theme
+    if (currentTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      themeIcon.classList.replace('bi-moon-fill', 'bi-sun-fill');
+    }
+    
+    // Toggle theme function
+    themeToggleBtn.addEventListener('click', () => {
+      let theme = 'light';
+      if (document.documentElement.getAttribute('data-theme') !== 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        themeIcon.classList.replace('bi-moon-fill', 'bi-sun-fill');
+        theme = 'dark';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        themeIcon.classList.replace('bi-sun-fill', 'bi-moon-fill');
+      }
+      localStorage.setItem('theme', theme);
+    });
   </script>
 
   <!-- ── Extra JS block for child templates ────────────────────────── -->

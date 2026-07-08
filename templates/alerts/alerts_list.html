@@ -89,10 +89,162 @@
   .nw-page-btn.disabled { opacity: 0.4; pointer-events: none; }
   .active-alerts-border { border-color: rgba(239, 68, 68, 0.3) !important; }
   .critical-alerts-border { border-color: rgba(239, 68, 68, 0.5) !important; }
+
+  /* ── Custom Confirmation Modal ────────────────────────────────────────────── */
+  #nw-confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.18s ease;
+  }
+  #nw-confirm-overlay.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  #nw-confirm-box {
+    background: var(--nw-bg-card);
+    border: 1px solid var(--nw-border);
+    border-radius: 16px;
+    padding: 32px 36px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    animation: slideUp 0.2s cubic-bezier(.4,0,.2,1);
+    text-align: center;
+  }
+  @keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .nw-confirm-icon-container {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+  }
+  .nw-confirm-icon-container.success {
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--nw-success);
+  }
+  .nw-confirm-icon-container.danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--nw-danger);
+  }
+  .nw-confirm-icon-container.warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--nw-warning);
+  }
+  #nw-confirm-icon-inner {
+    font-size: 24px;
+  }
+  #nw-confirm-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--nw-text-primary);
+    margin-bottom: 8px;
+  }
+  #nw-confirm-message {
+    font-size: 13px;
+    color: var(--nw-text-muted);
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .nw-confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .nw-confirm-cancel {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1px solid var(--nw-border);
+    background: var(--nw-bg-page);
+    color: var(--nw-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .nw-confirm-cancel:hover { color: var(--nw-text-primary); border-color: var(--nw-accent); }
+  .nw-confirm-proceed {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: white;
+  }
+  .nw-confirm-proceed.danger  { background: var(--nw-danger); }
+  .nw-confirm-proceed.success { background: var(--nw-success); }
+  .nw-confirm-proceed.warning { background: var(--nw-warning); color: #1a1a2e; }
+  .nw-confirm-proceed.danger:hover  { background: #dc2626; }
+  .nw-confirm-proceed.success:hover { background: #16a34a; }
+  .nw-confirm-proceed.warning:hover { background: #d97706; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+<!-- ── Custom Confirmation Modal ──────────────────────────────────────────── -->
+<div id="nw-confirm-overlay">
+  <div id="nw-confirm-box">
+    <div id="nw-confirm-icon-wrapper" class="nw-confirm-icon-container">
+      <i id="nw-confirm-icon-inner" class="bi"></i>
+    </div>
+    <div id="nw-confirm-title"></div>
+    <div id="nw-confirm-message"></div>
+    <div class="nw-confirm-actions">
+      <button class="nw-confirm-cancel" onclick="nwConfirmClose()">
+        <i class="bi bi-x-lg me-1"></i> Cancel
+      </button>
+      <button id="nw-confirm-proceed-btn" class="nw-confirm-proceed danger" onclick="nwConfirmProceed()">
+        <i class="bi bi-check-lg me-1"></i> Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden forms for row actions (rendered once per alert, outside the table) -->
+{% for alert in page_obj %}
+  {% if not alert.resolved %}
+  <form id="form-resolve-{{ alert.pk }}" method="post" action="{% url 'resolve_alert' alert.pk %}" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="alerts_list" />
+  </form>
+  {% else %}
+  <form id="form-reopen-{{ alert.pk }}" method="post" action="{% url 'reopen_alert' alert.pk %}" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="alerts_list" />
+  </form>
+  {% endif %}
+  {% if is_admin_user %}
+    {% if alert.ip_address in blocked_ips %}
+    <form id="form-unblock-{{ alert.pk }}" method="post" action="{% url 'unblock_ip_by_ip' alert.ip_address %}" style="display:none;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="alerts_list" />
+    </form>
+    {% else %}
+    <form id="form-block-{{ alert.pk }}" method="post" action="{% url 'block_ip' alert.pk %}" style="display:none;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="alerts_list" />
+    </form>
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+<!-- Bulk-resolve form (linked via form="bulk-alerts-form") -->
+<form id="bulk-alerts-form" method="POST" action="{% url 'bulk_resolve_alerts' %}" style="display:none;">
+  {% csrf_token %}
+</form>
 
 <!-- ── Django Messages ─────────────────────────────────────────────────── -->
 {% if messages %}
@@ -186,14 +338,28 @@
 <!-- ── Alerts Table ────────────────────────────────────────────────────── -->
 <div class="nw-card" style="padding:0; overflow:hidden;">
 
-  <div class="nw-section-header" style="padding:16px 20px 0;">
-    <div class="nw-section-title">
+  <div class="nw-section-header" style="padding:16px 20px 0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div class="nw-section-title" style="margin:0;">
       <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
       Alert History Log
+      <span style="font-size:12px; color:var(--nw-text-muted); font-weight:normal; margin-left:8px;">
+        ({{ page_obj.paginator.count }} alert{{ page_obj.paginator.count|pluralize }} found)
+      </span>
     </div>
-    <span style="font-size:12px; color:var(--nw-text-muted);">
-      {{ page_obj.paginator.count }} alert{{ page_obj.paginator.count|pluralize }} found
-    </span>
+
+    <!-- Bulk Actions -->
+    <div style="display:flex; gap:8px;">
+      <button type="button"
+        onclick="nwConfirmShow('resolve_selected', null, 'bi-check-circle-fill', 'Resolve Selected Alerts', 'This will mark all selected alerts as resolved. Continue?', 'success', 'Resolve Selected')"
+        class="btn btn-sm btn-outline-primary" style="font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px;">
+        <i class="bi bi-check-all me-1"></i>Resolve Selected
+      </button>
+      <button type="button"
+        onclick="nwConfirmShow('resolve_all', null, 'bi-lightning-charge-fill', 'Resolve All Active Alerts', 'This will mark <strong>all active alerts</strong> in the database as resolved. This action cannot be undone.', 'success', 'Resolve All')"
+        class="btn btn-sm btn-outline-success" style="font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px;">
+        <i class="bi bi-check-circle me-1"></i>Resolve All Active
+      </button>
+    </div>
   </div>
   <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
 
@@ -201,6 +367,9 @@
     <table class="nw-table">
       <thead>
         <tr>
+          <th style="width:40px; text-align:center;">
+            <input type="checkbox" id="check-all-alerts" style="cursor:pointer;" />
+          </th>
           <th>ID</th>
           <th>IP Address</th>
           <th>Requests</th>
@@ -214,6 +383,13 @@
       <tbody>
         {% for alert in page_obj %}
         <tr class="alert-row-{{ alert.severity }}">
+          <td style="text-align:center;">
+            {% if not alert.resolved %}
+            <input type="checkbox" name="selected_alerts" value="{{ alert.id }}" form="bulk-alerts-form" class="alert-checkbox" style="cursor:pointer;" />
+            {% else %}
+            <input type="checkbox" disabled style="opacity:0.3; cursor:not-allowed;" />
+            {% endif %}
+          </td>
           <td style="color:var(--nw-text-muted); font-size:12px;">#{{ alert.id }}</td>
 
           <td>
@@ -231,38 +407,37 @@
 
           <td>
             {% if alert.severity == 'critical' %}
-            <span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-octagon-fill"></i>Critical</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Critical</span>
             {% elif alert.severity == 'high' %}
-            <span class="nw-badge nw-badge-orange"><i class="bi bi-exclamation-triangle-fill"></i>High</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>High</span>
             {% elif alert.severity == 'medium' %}
-            <span class="nw-badge nw-badge-warning"><i class="bi bi-dash-circle-fill"></i>Medium</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-warning);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning);"></span>Medium</span>
             {% else %}
-            <span class="nw-badge nw-badge-info"><i class="bi bi-info-circle-fill"></i>Low</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-info);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-info);"></span>Low</span>
             {% endif %}
           </td>
 
-          {# Detection Type badge — shows which engine generated this alert #}
           <td>
             {% if alert.detection_type == 'traffic_spike' %}
-            <span class="nw-badge nw-badge-info" style="white-space:nowrap;">
-              <i class="bi bi-graph-up-arrow"></i> Traffic Spike
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-info); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-info);"></span>Traffic Spike
             </span>
             {% elif alert.detection_type == 'rate_limit' %}
-            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;">
-              <i class="bi bi-speedometer2"></i> Rate Limit
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>Rate Limit
             </span>
             {% else %}
-            <span class="nw-badge nw-badge-secondary" style="white-space:nowrap;">
-              <i class="bi bi-person-fill-gear"></i> {{ alert.detection_type_label }}
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>{{ alert.detection_type_label }}
             </span>
             {% endif %}
           </td>
 
           <td>
             {% if alert.resolved %}
-            <span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill"></i>Resolved</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-success);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>Resolved</span>
             {% else %}
-            <span class="nw-badge nw-badge-danger"><i class="bi bi-record-circle-fill"></i>Active</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Active</span>
             {% endif %}
           </td>
 
@@ -270,42 +445,48 @@
 
           <td>
             <div style="display:flex; gap:6px; align-items:center;">
-              <a href="{% url 'alert_detail' alert.pk %}"
+              <a href="{% url 'alert_detail' alert.pk %}" title="View Alert Details"
                 style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); color:var(--nw-accent);
-                border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; text-decoration:none;
-                transition:all 0.2s;">
-                <i class="bi bi-eye-fill"></i> View
+                width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none;
+                transition:all 0.2s; border-radius:6px;">
+                <i class="bi bi-eye-fill"></i>
               </a>
 
               {% if not alert.resolved %}
-              <form method="post" action="{% url 'resolve_alert' alert.pk %}"
-                style="display:inline;"
-                onsubmit="return confirm('Mark alert #{{ alert.id }} as resolved?')">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="alerts_list" />
-                <button type="submit" class="resolve-btn">
-                  <i class="bi bi-check2"></i> Resolve
-                </button>
-              </form>
+              <button type="button" class="resolve-btn" title="Resolve Alert"
+                style="width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0; line-height:0;"
+                onclick="nwConfirmShow('submit_form', 'form-resolve-{{ alert.pk }}', 'bi-check-circle-fill', 'Resolve Alert #{{ alert.id }}', 'Mark alert <strong>#{{ alert.id }}</strong> ({{ alert.ip_address }}) as resolved?', 'success', 'Resolve Alert')">
+                <i class="bi bi-check2"></i>
+              </button>
+              {% else %}
+              <button type="button" class="btn btn-sm btn-outline-warning" title="Reopen Alert"
+                style="width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0; line-height:0;"
+                onclick="nwConfirmShow('submit_form', 'form-reopen-{{ alert.pk }}', 'bi-arrow-counterclockwise', 'Reopen Alert #{{ alert.id }}', 'Reopen alert <strong>#{{ alert.id }}</strong> for re-investigation?', 'warning', 'Reopen Alert')">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
               {% endif %}
-              
+
               {% if is_admin_user %}
-              <form method="post" action="{% url 'block_ip' alert.pk %}"
-                style="display:inline;"
-                onsubmit="return confirm('Add IP {{ alert.ip_address }} to blocklist?')">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="alerts_list" />
-                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:11px; font-weight:600; padding:5px 10px;">
-                  <i class="bi bi-shield-lock"></i> Block IP
+                {% if alert.ip_address in blocked_ips %}
+                <button type="button" class="btn btn-sm btn-danger" title="Unblock IP Address"
+                  style="width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0; border:none; line-height:0;"
+                  onclick="nwConfirmShow('submit_form', 'form-unblock-{{ alert.pk }}', 'bi-shield-check', 'Unblock IP Address', 'Remove <strong>{{ alert.ip_address }}</strong> from the blocklist? They will be allowed to access ShopSafe again.', 'warning', 'Unblock IP')">
+                  <i class="bi bi-shield-check"></i>
                 </button>
-              </form>
+                {% else %}
+                <button type="button" class="btn btn-sm btn-outline-danger" title="Block IP Address"
+                  style="width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:0; line-height:0;"
+                  onclick="nwConfirmShow('submit_form', 'form-block-{{ alert.pk }}', 'bi-shield-lock-fill', 'Block IP Address', 'Add <strong>{{ alert.ip_address }}</strong> to the blocklist? All future requests from this IP will be blocked (403).', 'danger', 'Block IP')">
+                  <i class="bi bi-shield-lock"></i>
+                </button>
+                {% endif %}
               {% endif %}
             </div>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7">
+          <td colspan="9">
             <div class="nw-empty-state">
               <i class="bi bi-shield-check" style="color:var(--nw-success); opacity:0.6;"></i>
               <p style="color:var(--nw-success);">No alerts match your filter.</p>
@@ -350,6 +531,75 @@
   </div>
   {% endif %}
 
-</div>
+</div> <!-- End nw-card -->
 
+<script>
+  // ── Select-All Checkbox ───────────────────────────────────────────────────
+  document.getElementById('check-all-alerts').addEventListener('change', function() {
+    document.querySelectorAll('.alert-checkbox').forEach(cb => cb.checked = this.checked);
+  });
+
+  // ── Custom Confirmation Modal ─────────────────────────────────────────────
+  let _pendingAction   = null;   // 'submit_form' | 'resolve_selected' | 'resolve_all'
+  let _pendingFormId   = null;   // form id string for submit_form
+  let _pendingBtnStyle = 'danger'; // button style class
+
+  function nwConfirmShow(action, formId, iconClass, title, message, style, proceedLabel) {
+    _pendingAction   = action;
+    _pendingFormId   = formId;
+    _pendingBtnStyle = style;
+
+    const iconWrapper = document.getElementById('nw-confirm-icon-wrapper');
+    iconWrapper.className = 'nw-confirm-icon-container ' + style;
+
+    const iconInner = document.getElementById('nw-confirm-icon-inner');
+    iconInner.className = 'bi ' + iconClass;
+
+    document.getElementById('nw-confirm-title').textContent   = title;
+    document.getElementById('nw-confirm-message').innerHTML   = message;
+
+    const btn = document.getElementById('nw-confirm-proceed-btn');
+    btn.className = 'nw-confirm-proceed ' + style;
+    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>' + proceedLabel;
+
+    const overlay = document.getElementById('nw-confirm-overlay');
+    overlay.classList.add('show');
+  }
+
+  function nwConfirmClose() {
+    document.getElementById('nw-confirm-overlay').classList.remove('show');
+    _pendingAction = null;
+    _pendingFormId = null;
+  }
+
+  function nwConfirmProceed() {
+    if (_pendingAction === 'submit_form' && _pendingFormId) {
+      document.getElementById(_pendingFormId).submit();
+    } else if (_pendingAction === 'resolve_selected') {
+      const bulk = document.getElementById('bulk-alerts-form');
+      // inject bulk_action value and submit
+      let inp = bulk.querySelector('input[name="bulk_action"]');
+      if (!inp) { inp = document.createElement('input'); inp.type='hidden'; inp.name='bulk_action'; bulk.appendChild(inp); }
+      inp.value = 'resolve_selected';
+      bulk.submit();
+    } else if (_pendingAction === 'resolve_all') {
+      const bulk = document.getElementById('bulk-alerts-form');
+      let inp = bulk.querySelector('input[name="bulk_action"]');
+      if (!inp) { inp = document.createElement('input'); inp.type='hidden'; inp.name='bulk_action'; bulk.appendChild(inp); }
+      inp.value = 'resolve_all';
+      bulk.submit();
+    }
+    nwConfirmClose();
+  }
+
+  // Close modal when clicking backdrop
+  document.getElementById('nw-confirm-overlay').addEventListener('click', function(e) {
+    if (e.target === this) nwConfirmClose();
+  });
+
+  // Close modal with Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') nwConfirmClose();
+  });
+</script>
 {% endblock %}

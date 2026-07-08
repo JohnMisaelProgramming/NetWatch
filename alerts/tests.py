@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import Profile
-from .models import Alert, IPBlocklist, RateLimitViolation, SystemSettings, SimulationRun, IPWhitelist
+from alerts.models import Alert, IPBlocklist, RateLimitViolation, SystemSettings, SimulationRun, IPWhitelist
 from traffic.models import TrafficLog
 
 
@@ -174,7 +174,7 @@ class ThreatSeverityAlgorithmTests(TestCase):
 		self.settings = SystemSettings.get_settings()
 
 	def test_get_severity_uses_settings_thresholds(self):
-		from .detector import get_severity
+		from alerts.detector import get_severity
 		# Default thresholds: Medium=20, High=50, Critical=100
 		self.assertEqual(get_severity(10, self.settings), Alert.SEVERITY_LOW)
 		self.assertEqual(get_severity(25, self.settings), Alert.SEVERITY_MEDIUM)
@@ -194,7 +194,7 @@ class ThreatSeverityAlgorithmTests(TestCase):
 		self.assertEqual(get_severity(16, self.settings), Alert.SEVERITY_CRITICAL)
 
 	def test_get_rate_limit_severity_uses_settings_multipliers(self):
-		from .detector import get_rate_limit_severity
+		from alerts.detector import get_rate_limit_severity
 		threshold = 10
 		# Default multipliers: High=2.0, Critical=4.0
 		# Medium if >= threshold (10), High if >= 20, Critical if >= 40
@@ -292,7 +292,7 @@ class AutomaticIPBlockingTests(TestCase):
 
 	def test_auto_blocking_disabled_by_default(self):
 		from traffic.models import TrafficLog
-		from .detector import detect_ddos
+		from alerts.detector import detect_ddos
 		
 		# Keep enable_auto_blocking False
 		self.settings.enable_auto_blocking = False
@@ -313,7 +313,7 @@ class AutomaticIPBlockingTests(TestCase):
 
 	def test_auto_blocking_triggers_when_enabled(self):
 		from traffic.models import TrafficLog
-		from .detector import detect_ddos
+		from alerts.detector import detect_ddos
 		
 		# Enable auto-blocking, set threshold
 		self.settings.enable_auto_blocking = True
@@ -375,14 +375,16 @@ class SimulationValidationLabTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 
 	def test_middleware_extracts_simulated_ip(self):
-		# Send a request with simulated IP header
+		# Send a request with simulated IP header from a blocked IP
 		simulated_ip = '8.8.8.8'
+		from alerts.models import IPBlocklist
+		IPBlocklist.objects.create(ip_address=simulated_ip, reason="Test block")
+		
 		self.client.force_login(self.viewer)
 		response = self.client.get(reverse('dashboard'), HTTP_X_NETWATCH_SIMULATED_IP=simulated_ip)
 		
-		# Confirm a TrafficLog was created with the simulated IP
-		from traffic.models import TrafficLog
-		self.assertTrue(TrafficLog.objects.filter(ip_address=simulated_ip).exists())
+		# Confirm that the request is blocked with 403 Forbidden because the simulated IP was extracted
+		self.assertEqual(response.status_code, 403)
 
 	def test_start_simulation_endpoint(self):
 		self.client.force_login(self.admin)

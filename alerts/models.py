@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 
 class Alert(models.Model):
@@ -31,11 +32,15 @@ class Alert(models.Model):
     #   - MANUAL:         Reserved for future admin-generated alerts
     DETECTION_SPIKE      = 'traffic_spike'
     DETECTION_RATE_LIMIT = 'rate_limit'
+    DETECTION_BRUTE_FORCE = 'brute_force'
+    DETECTION_FAILED_LOGIN = 'failed_login'
     DETECTION_MANUAL     = 'manual'
 
     DETECTION_TYPE_CHOICES = [
         (DETECTION_SPIKE,      'Traffic Spike'),
         (DETECTION_RATE_LIMIT, 'Rate Limit Violation'),
+        (DETECTION_BRUTE_FORCE, 'Brute Force Attack'),
+        (DETECTION_FAILED_LOGIN, 'Failed Login Spike'),
         (DETECTION_MANUAL,     'Manual'),
     ]
 
@@ -54,6 +59,15 @@ class Alert(models.Model):
 
     resolved = models.BooleanField(default=False)
     # False = alert is active/unresolved; True = admin has acknowledged it
+
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='resolved_alerts',
+    )
+    # The user who resolved this alert (null if unresolved or resolved by system)
+
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    # Timestamp when the alert was resolved
 
     severity = models.CharField(
         max_length=10,
@@ -136,6 +150,11 @@ class SystemSettings(models.Model):
     enable_auto_blocking = models.BooleanField(default=False, help_text="Enable automatic IP blocking when threshold is exceeded")
     auto_block_threshold = models.IntegerField(default=100, help_text="Request threshold to trigger automatic IP blocking")
     enable_maintenance_mode = models.BooleanField(default=False, help_text="Put the system into maintenance mode (blocks non-admins)")
+
+    data_retention_days = models.IntegerField(
+        default=90,
+        help_text="Auto-delete traffic logs older than this many days (0 = keep forever)"
+    )
 
     def __str__(self):
         return "Global Detection Settings"
@@ -283,3 +302,85 @@ class SimulationRun(models.Model):
 
     class Meta:
         ordering = ['-started_at']
+
+
+class AuditLog(models.Model):
+    """
+    Records all significant user actions for accountability and non-repudiation.
+    Every resolve, block, unblock, and settings change is logged here.
+    """
+    ACTION_CHOICES = [
+        ('resolve_alert', 'Resolved Alert'),
+        ('reopen_alert', 'Reopened Alert'),
+        ('block_ip', 'Blocked IP'),
+        ('unblock_ip', 'Unblocked IP'),
+        ('whitelist_ip', 'Whitelisted IP'),
+        ('remove_whitelist', 'Removed Whitelist'),
+        ('update_settings', 'Updated Settings'),
+        ('bulk_resolve', 'Bulk Resolved Alerts'),
+        ('change_password', 'Changed Password'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='audit_logs',
+    )
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    target = models.CharField(max_length=255)
+    details = models.TextField(blank=True)
+    ip_address = models.CharField(max_length=100, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f"{self.user} — {self.get_action_display()} — {self.target}"
+
+    class Meta:
+        ordering = ['-timestamp']
+
+
+class AlertNote(models.Model):
+    """
+    Investigation notes that analysts can attach to alerts.
+    Allows team members to document findings during threat analysis.
+    """
+    alert = models.ForeignKey(
+        Alert, on_delete=models.CASCADE, related_name='notes',
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='alert_notes',
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Note on Alert #{self.alert_id} by {self.author}"
+
+    class Meta:
+        ordering = ['created_at']
+
+
+class SecurityEvent(models.Model):
+    EVENT_CHOICES = [
+        ('failed_login', 'Failed Login'),
+        ('lockout', 'Account Lockout'),
+        ('otp_verification', 'OTP Verification'),
+        ('successful_login', 'Successful Login'),
+        ('logout', 'Successful Logout'),
+        ('blocked', 'IP Blocked'),
+        ('whitelist', 'IP Whitelists'),
+        ('performance_telemetry', 'Performance Telemetry'),
+    ]
+    ip_address = models.CharField(max_length=100, db_index=True)
+    event_type = models.CharField(max_length=50, choices=EVENT_CHOICES, db_index=True)
+    username = models.CharField(max_length=150, blank=True, null=True)
+    details = models.TextField(blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    source = models.CharField(max_length=50, default='shopsafe')
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f"[{self.event_type.upper()}] {self.ip_address} — {self.username}"
+
+    class Meta:
+        ordering = ['-timestamp']

@@ -30,23 +30,13 @@
     background: var(--nw-accent);
     border-radius: 2px;
   }
-  .chart-wrapper { position: relative; }
-
-  /* Stat pill */
-  .nw-stat-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--nw-bg-card-hover);
-    border: 1px solid var(--nw-border);
-    color: var(--nw-text-muted);
-    margin-right: 6px;
-    margin-bottom: 6px;
+  .chart-wrapper {
+    position: relative;
+    height: 200px;
+    width: 100%;
   }
+
+  /* Stat pill style removed in favor of clean text indicators */
 
   /* Rank bar for top IPs / URLs */
   .rank-bar-bg {
@@ -70,7 +60,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 240px;
+    height: 100%;
     color: var(--nw-text-muted);
     font-size: 13px;
     flex-direction: column;
@@ -92,8 +82,9 @@
     border-radius: 12px;
     padding: 14px 20px;
     display: flex;
-    align-items: flex-end;
-    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
     margin-bottom: 20px;
   }
@@ -138,71 +129,63 @@
 
 {% block content %}
 
-<!-- ── Page Header ─────────────────────────────────────────────────────── -->
-<div class="d-flex align-items-center justify-content-between mb-4">
-  <div>
-    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
-      Traffic Visualization & Analytics
-    </h1>
-    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
-      Chart.js powered — data refreshes every 10 seconds
-    </p>
+<form method="get" id="analytics-filter-form" class="analytics-filter-bar">
+  <div class="d-flex align-items-center flex-wrap gap-3">
+    <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px;">
+      <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
+    </div>
+
+    <!-- IP Address -->
+    <div class="filter-group">
+      <label class="filter-label">IP Address</label>
+      <input type="text" name="ip_address" value="{{ ip_address }}"
+        class="filter-input" placeholder="e.g. 192.168" style="width:130px;" />
+    </div>
+
+    <!-- Request Method -->
+    <div class="filter-group">
+      <label class="filter-label">Method</label>
+      <select name="request_method" class="filter-input">
+        <option value="">All</option>
+        <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
+        <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
+        <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
+        <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
+      </select>
+    </div>
+
+    <!-- Date From -->
+    <div class="filter-group">
+      <label class="filter-label">From Date</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" style="padding: 5px 12px;" />
+    </div>
+
+    <!-- Date To -->
+    <div class="filter-group">
+      <label class="filter-label">To Date</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" style="padding: 5px 12px;" />
+    </div>
+
+    <div class="d-flex gap-2" style="margin-bottom: -2px;">
+      <button type="submit" class="filter-btn btn-primary-nw" style="padding: 6px 14px;">
+        <i class="bi bi-search"></i> Apply
+      </button>
+      <a href="{% url 'analytics' %}" class="filter-btn btn-ghost-nw" style="padding: 6px 14px;">
+        <i class="bi bi-x-lg"></i> Clear
+      </a>
+    </div>
   </div>
-  <!-- Summary Pills -->
-  <div>
-    <span class="nw-stat-pill" id="analytics-total-requests">
-      <i class="bi bi-activity" style="color:var(--nw-accent);"></i>
+
+  <div class="d-flex align-items-center gap-3">
+    <span id="analytics-total-requests" style="font-size:11px; font-weight:600; color:var(--nw-accent); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-activity"></i>
       {{ total_requests }} Total Requests
     </span>
-    <span class="nw-stat-pill" id="analytics-total-alerts">
-      <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
+    <span id="analytics-total-alerts" style="font-size:11px; font-weight:600; color:var(--nw-danger); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:6px;">
+      <i class="bi bi-bell-fill"></i>
       {{ total_alerts }} Total Alerts
     </span>
   </div>
-</div>
-
-<form method="get" id="analytics-filter-form" class="analytics-filter-bar">
-  <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px; padding-bottom: 6px;">
-    <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
-  </div>
-
-  <!-- IP Address -->
-  <div class="filter-group">
-    <label class="filter-label">IP Address</label>
-    <input type="text" name="ip_address" value="{{ ip_address }}"
-      class="filter-input" placeholder="e.g. 192.168" style="width:130px;" />
-  </div>
-
-  <!-- Request Method -->
-  <div class="filter-group">
-    <label class="filter-label">Method</label>
-    <select name="request_method" class="filter-input">
-      <option value="">All</option>
-      <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
-      <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
-      <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
-      <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
-    </select>
-  </div>
-
-  <!-- Date From -->
-  <div class="filter-group">
-    <label class="filter-label">From Date</label>
-    <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
-  </div>
-
-  <!-- Date To -->
-  <div class="filter-group">
-    <label class="filter-label">To Date</label>
-    <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
-  </div>
-
-  <button type="submit" class="filter-btn btn-primary-nw">
-    <i class="bi bi-search"></i> Apply
-  </button>
-  <a href="{% url 'analytics' %}" class="filter-btn btn-ghost-nw">
-    <i class="bi bi-x-lg"></i> Clear
-  </a>
 </form>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -261,11 +244,13 @@
         Alert Frequency &nbsp;
         <span style="font-size:11px; color:var(--nw-text-muted); font-weight:400;">Last 7 days</span>
       </div>
-      <div class="chart-loading" id="alerts-loading">
-        <div class="nw-spinner"></div>
-        Loading chart data…
+      <div class="chart-wrapper">
+        <div class="chart-loading" id="alerts-loading">
+          <div class="nw-spinner"></div>
+          Loading chart data…
+        </div>
+        <canvas id="chart-alerts" style="display:none;"></canvas>
       </div>
-      <canvas id="chart-alerts" height="200" style="display:none;"></canvas>
     </div>
   </div>
 
@@ -278,7 +263,9 @@
       </div>
       <div class="row align-items-center">
         <div class="col-7">
-          <canvas id="chart-severity" height="220"></canvas>
+          <div class="chart-wrapper" style="height: 180px;">
+            <canvas id="chart-severity"></canvas>
+          </div>
         </div>
         <div class="col-5">
           <div style="display:flex; flex-direction:column; gap:10px;">
@@ -503,6 +490,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         animation: { duration: 750 },
         plugins: { legend: { display: false } },
         scales: {
@@ -537,6 +525,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         animation: { duration: 750 },
         plugins: { legend: { display: false } },
         scales: {
@@ -574,6 +563,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         animation: { duration: 750 },
         plugins: { legend: { display: false } },
         scales: {
@@ -614,6 +604,8 @@
         }]
       },
       options: {
+        responsive: true,
+        maintainAspectRatio: false,
         cutout: '70%',
         animation: { duration: 750 },
         plugins: { legend: { display: false } }

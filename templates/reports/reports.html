@@ -13,8 +13,9 @@
     border-radius: 12px;
     padding: 16px 20px;
     display: flex;
-    align-items: flex-end;
-    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
     margin-bottom: 24px;
   }
@@ -133,106 +134,101 @@
 
 {% block content %}
 
-<!-- ── Page Header ─────────────────────────────────────────────────── -->
-<div class="d-flex align-items-center justify-content-between mb-4">
-  <div>
-    <h1 style="font-size:22px; font-weight:700; color:var(--nw-text-primary); margin:0;">
-      Reports & Audit Module
-    </h1>
-    <p style="color:var(--nw-text-muted); font-size:13px; margin:4px 0 0;">
-      Generated at {{ report_generated_at|date:"d F Y — H:i" }} UTC
-    </p>
-  </div>
-  <span class="nw-badge nw-badge-secondary">
-    <i class="bi bi-file-earmark-bar-graph-fill"></i>
-    {{ date_from|default:"All time" }} → {{ date_to|default:"Present" }}
-  </span>
-</div>
-
 <form method="get" id="report-filter-form">
 
   <div class="report-filter-bar">
-    <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px; white-space:nowrap;">
-      <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
+    <div class="d-flex align-items-center flex-wrap gap-3">
+      <div style="font-size:13px; font-weight:600; color:var(--nw-text-muted); margin-right:4px; white-space:nowrap;">
+        <i class="bi bi-funnel" style="margin-right:4px;"></i>Filters
+      </div>
+
+      <!-- Date From -->
+      <div class="filter-group">
+        <label class="filter-label">From Date</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" style="padding: 7px 12px;" />
+      </div>
+
+      <!-- Date To -->
+      <div class="filter-group">
+        <label class="filter-label">To Date</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" style="padding: 7px 12px;" />
+      </div>
+
+      <!-- IP Address search -->
+      <div class="filter-group">
+        <label class="filter-label">IP Address</label>
+        <input type="text" name="ip_address" value="{{ ip_address }}"
+          class="filter-input" placeholder="e.g. 192.168" style="width:130px; padding: 7px 12px;" />
+      </div>
+
+      <!-- URL search -->
+      <div class="filter-group">
+        <label class="filter-label">URL Contains</label>
+        <input type="text" name="url_search" value="{{ url_search }}"
+          class="filter-input" placeholder="e.g. /admin" style="width:130px; padding: 7px 12px;" />
+      </div>
+
+      <!-- Severity -->
+      <div class="filter-group">
+        <label class="filter-label">Severity</label>
+        <select name="severity" class="filter-input" style="padding: 7px 12px;">
+          <option value="">All</option>
+          <option value="critical" {% if severity == 'critical' %}selected{% endif %}>Critical</option>
+          <option value="high"     {% if severity == 'high'     %}selected{% endif %}>High</option>
+          <option value="medium"   {% if severity == 'medium'   %}selected{% endif %}>Medium</option>
+          <option value="low"      {% if severity == 'low'      %}selected{% endif %}>Low</option>
+        </select>
+      </div>
+
+      <!-- Detection Type -->
+      <div class="filter-group">
+        <label class="filter-label">Detection Type</label>
+        <select name="detection_type" class="filter-input" style="padding: 7px 12px;">
+          <option value="">All</option>
+          <option value="traffic_spike" {% if detection_type == 'traffic_spike' %}selected{% endif %}>Traffic Spike</option>
+          <option value="rate_limit" {% if detection_type == 'rate_limit' %}selected{% endif %}>Rate Limit</option>
+          <option value="manual" {% if detection_type == 'manual' %}selected{% endif %}>Manual</option>
+        </select>
+      </div>
+
+      <!-- Alert Status -->
+      <div class="filter-group">
+        <label class="filter-label">Status</label>
+        <select name="alert_status" class="filter-input" style="padding: 7px 12px;">
+          <option value="">All</option>
+          <option value="active"   {% if alert_status == 'active'   %}selected{% endif %}>Active</option>
+          <option value="resolved" {% if alert_status == 'resolved' %}selected{% endif %}>Resolved</option>
+        </select>
+      </div>
+
+      <!-- Request Method -->
+      <div class="filter-group">
+        <label class="filter-label">Method</label>
+        <select name="request_method" class="filter-input" style="padding: 7px 12px;">
+          <option value="">All</option>
+          <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
+          <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
+          <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
+          <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
+        </select>
+      </div>
+
+      <div class="d-flex gap-2" style="margin-bottom: -2px;">
+        <button type="submit" class="filter-btn btn-primary-nw" style="padding: 8px 16px;">
+          <i class="bi bi-search"></i> Apply
+        </button>
+        <a href="{% url 'reports' %}" class="filter-btn btn-ghost-nw" style="padding: 8px 16px;">
+          <i class="bi bi-x-lg"></i> Clear
+        </a>
+      </div>
     </div>
 
-    <!-- Date From -->
-    <div class="filter-group">
-      <label class="filter-label">From Date</label>
-      <input type="date" name="date_from" value="{{ date_from }}" class="filter-input" />
+    <div>
+      <span style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:6px;">
+        <i class="bi bi-calendar3"></i>
+        {{ date_from|default:"All time" }} → {{ date_to|default:"Present" }}
+      </span>
     </div>
-
-    <!-- Date To -->
-    <div class="filter-group">
-      <label class="filter-label">To Date</label>
-      <input type="date" name="date_to" value="{{ date_to }}" class="filter-input" />
-    </div>
-
-    <!-- IP Address search -->
-    <div class="filter-group">
-      <label class="filter-label">IP Address</label>
-      <input type="text" name="ip_address" value="{{ ip_address }}"
-        class="filter-input" placeholder="e.g. 192.168" style="width:130px;" />
-    </div>
-
-    <!-- URL search -->
-    <div class="filter-group">
-      <label class="filter-label">URL Contains</label>
-      <input type="text" name="url_search" value="{{ url_search }}"
-        class="filter-input" placeholder="e.g. /admin" style="width:130px;" />
-    </div>
-
-    <!-- Severity -->
-    <div class="filter-group">
-      <label class="filter-label">Severity</label>
-      <select name="severity" class="filter-input">
-        <option value="">All</option>
-        <option value="critical" {% if severity == 'critical' %}selected{% endif %}>Critical</option>
-        <option value="high"     {% if severity == 'high'     %}selected{% endif %}>High</option>
-        <option value="medium"   {% if severity == 'medium'   %}selected{% endif %}>Medium</option>
-        <option value="low"      {% if severity == 'low'      %}selected{% endif %}>Low</option>
-      </select>
-    </div>
-
-    <!-- Detection Type -->
-    <div class="filter-group">
-      <label class="filter-label">Detection Type</label>
-      <select name="detection_type" class="filter-input">
-        <option value="">All</option>
-        <option value="traffic_spike" {% if detection_type == 'traffic_spike' %}selected{% endif %}>Traffic Spike</option>
-        <option value="rate_limit" {% if detection_type == 'rate_limit' %}selected{% endif %}>Rate Limit</option>
-        <option value="manual" {% if detection_type == 'manual' %}selected{% endif %}>Manual</option>
-      </select>
-    </div>
-
-    <!-- Alert Status -->
-    <div class="filter-group">
-      <label class="filter-label">Status</label>
-      <select name="alert_status" class="filter-input">
-        <option value="">All</option>
-        <option value="active"   {% if alert_status == 'active'   %}selected{% endif %}>Active</option>
-        <option value="resolved" {% if alert_status == 'resolved' %}selected{% endif %}>Resolved</option>
-      </select>
-    </div>
-
-    <!-- Request Method -->
-    <div class="filter-group">
-      <label class="filter-label">Method</label>
-      <select name="request_method" class="filter-input">
-        <option value="">All</option>
-        <option value="GET" {% if request_method == 'GET' %}selected{% endif %}>GET</option>
-        <option value="POST" {% if request_method == 'POST' %}selected{% endif %}>POST</option>
-        <option value="PUT" {% if request_method == 'PUT' %}selected{% endif %}>PUT</option>
-        <option value="DELETE" {% if request_method == 'DELETE' %}selected{% endif %}>DELETE</option>
-      </select>
-    </div>
-
-    <button type="submit" class="filter-btn btn-primary-nw">
-      <i class="bi bi-search"></i> Apply
-    </button>
-    <a href="{% url 'reports' %}" class="filter-btn btn-ghost-nw">
-      <i class="bi bi-x-lg"></i> Clear
-    </a>
   </div>
 </form>
 
@@ -576,35 +572,35 @@
           <td><span style="font-weight:700;">{{ alert.request_count }}</span></td>
           <td>
             {% if alert.severity == 'critical' %}
-            <span class="nw-badge nw-badge-danger">Critical</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Critical</span>
             {% elif alert.severity == 'high' %}
-            <span class="nw-badge nw-badge-orange">High</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>High</span>
             {% elif alert.severity == 'medium' %}
-            <span class="nw-badge nw-badge-warning">Medium</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-warning);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning);"></span>Medium</span>
             {% else %}
-            <span class="nw-badge nw-badge-info">Low</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-info);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-info);"></span>Low</span>
             {% endif %}
           </td>
           <td>
             {% if alert.detection_type == 'traffic_spike' %}
-            <span class="nw-badge nw-badge-info" style="white-space:nowrap;">
-              <i class="bi bi-graph-up-arrow"></i> Traffic Spike
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-info); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-info);"></span>Traffic Spike
             </span>
             {% elif alert.detection_type == 'rate_limit' %}
-            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;">
-              <i class="bi bi-speedometer2"></i> Rate Limit
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>Rate Limit
             </span>
             {% else %}
-            <span class="nw-badge nw-badge-secondary" style="white-space:nowrap;">
-              <i class="bi bi-person-fill-gear"></i> {{ alert.detection_type_label }}
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted); white-space:nowrap;">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>{{ alert.detection_type_label }}
             </span>
             {% endif %}
           </td>
           <td>
             {% if alert.resolved %}
-            <span class="nw-badge nw-badge-success">Resolved</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-success);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>Resolved</span>
             {% else %}
-            <span class="nw-badge nw-badge-danger">Active</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Active</span>
             {% endif %}
           </td>
           <td><span class="nw-timestamp">{{ alert.timestamp|date:"d M Y H:i" }}</span></td>
@@ -689,15 +685,15 @@
             </span>
           </td>
           <td>
-            <span class="badge bg-secondary" style="font-size:10px;">{{ log.request_method }}</span>
+            <span style="font-size:12.5px; font-weight:600; color:var(--nw-text-muted);">{{ log.request_method }}</span>
           </td>
           <td>
             {% if log.ip_address in blocked_ips %}
-            <span class="nw-badge nw-badge-danger" style="white-space:nowrap;"><i class="bi bi-slash-circle-fill"></i> Blocked</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Blocked</span>
             {% elif log.ip_address in alerted_ips %}
-            <span class="nw-badge nw-badge-orange" style="white-space:nowrap;"><i class="bi bi-exclamation-triangle-fill"></i> Threat IP</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>Threat IP</span>
             {% else %}
-            <span class="nw-badge nw-badge-success" style="white-space:nowrap;"><i class="bi bi-shield-check"></i> Safe</span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-success);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>Safe</span>
             {% endif %}
           </td>
         </tr>

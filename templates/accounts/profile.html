@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_breadcrumb %}Account / Profile{% endblock %}
+{% block nav_profile %}nw-nav-active{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Profile Summary Card -->
+  <div class="col-lg-4">
+    <div class="nw-card p-4 text-center">
+      <!-- Profile Image / Avatar container -->
+      <div style="position:relative; display:inline-block; margin:0 auto 20px;">
+        {% if profile.avatar %}
+          <img src="{{ profile.avatar.url }}" alt="Avatar" 
+               style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:3px solid var(--nw-accent); box-shadow:0 0 15px rgba(37,99,235,0.25);">
+        {% else %}
+          <div style="width:120px; height:120px; border-radius:50%; background:linear-gradient(135deg, var(--nw-accent), #6366f1); display:flex; align-items:center; justify-content:center; font-size:48px; font-weight:700; color:white; border:3px solid rgba(255,255,255,0.1); margin:0 auto;">
+            {{ request.user.username|first|upper }}
+          </div>
+        {% endif %}
+      </div>
+
+      <h4 style="margin:0; font-weight:700; color:var(--nw-text-primary);">{{ request.user.username }}</h4>
+      <div style="font-size:13px; font-weight:600; color:var(--nw-accent); margin-top:4px;">
+        {{ profile.title|default:"Security Analyst" }}
+      </div>
+      <div style="font-size:12px; color:var(--nw-text-muted); margin-top:2px;">
+        {{ profile.department|default:"Security Operations" }}
+      </div>
+
+      <div style="height:1px; background:var(--nw-border); margin:20px 0;"></div>
+
+      <div style="text-align:left;">
+        <span style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px;">Bio / Brief</span>
+        <p style="font-size:13px; color:var(--nw-text-primary); margin-top:4px; line-height:1.5;">
+          {{ profile.bio|default:"No security bio documented for this user dossier." }}
+        </p>
+      </div>
+
+      <div style="height:1px; background:var(--nw-border); margin:20px 0;"></div>
+
+      <button type="button" class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#editProfileModal" style="font-size:12px; font-weight:600; padding:8px 0; border-radius:6px;">
+        <i class="bi bi-pencil-square me-1"></i>Edit Profile Details
+      </button>
+    </div>
+  </div>
+
+  <!-- Detailed Metadata Profile Grid -->
+  <div class="col-lg-8">
+    {% if messages %}
+      {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-3" style="font-size:13px; border-radius:8px;">
+        {{ message }}
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="nw-card p-4 mb-3">
+      <h5 class="mb-4" style="font-weight:700; color:var(--nw-text-primary);">
+        <i class="bi bi-person-lines-fill me-2" style="color:var(--nw-accent);"></i>Dossier Details
+      </h5>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">First Name</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ request.user.first_name|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Last Name</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ request.user.last_name|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">System Role</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ user_role|title }}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Email Address</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ request.user.email|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Contact Number</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ profile.phone_number|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="nw-card p-3" style="background:var(--nw-bg-page); border:1px solid var(--nw-border);">
+            <div style="font-size:10px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Date Enrolled</div>
+            <div style="font-weight:600; color:var(--nw-text-primary); font-size:14px;">{{ request.user.date_joined|date:"M d, Y" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Credentials Card -->
+    <div class="nw-card p-4">
+      <h5 class="mb-3" style="font-weight:700; color:var(--nw-text-primary);">
+        <i class="bi bi-shield-lock me-2" style="color:var(--nw-accent);"></i>Access Settings
+      </h5>
+      <p style="font-size:13px; color:var(--nw-text-muted); margin-bottom:16px;">
+        To secure your access logs and credential policies, modify your password periodically.
+      </p>
+      <a href="{% url 'change_password' %}" class="btn btn-sm btn-primary" style="background:var(--nw-accent); border:none; padding:8px 20px; font-weight:600; border-radius:6px;">
+        <i class="bi bi-key me-1"></i>Change System Password
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content nw-card" style="border: 1px solid var(--nw-border); padding: 0;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--nw-border); padding: 16px 24px;">
+        <h5 class="modal-title" id="editProfileModalLabel" style="font-weight: 700; color: var(--nw-text-primary);">
+          <i class="bi bi-pencil-square me-2" style="color:var(--nw-accent);"></i>Edit Profile Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body" style="padding: 24px; max-height: 480px; overflow-y: auto;">
+          <div class="mb-3">
+            <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Profile Image</label>
+            <input type="file" name="avatar" class="form-control" accept="image/*" style="font-size: 13px;">
+            <small style="font-size: 11px; color: var(--nw-text-muted);">PNG, JPG, or GIF up to 2MB. Square crop recommended.</small>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">First Name</label>
+              <input type="text" name="first_name" value="{{ request.user.first_name }}" class="form-control" style="font-size: 13px;">
+            </div>
+            <div class="col-6">
+              <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Last Name</label>
+              <input type="text" name="last_name" value="{{ request.user.last_name }}" class="form-control" style="font-size: 13px;">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Email Address</label>
+            <input type="email" name="email" value="{{ request.user.email }}" class="form-control" style="font-size: 13px;">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Title</label>
+              <input type="text" name="title" value="{{ profile.title }}" class="form-control" style="font-size: 13px;">
+            </div>
+            <div class="col-6">
+              <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Department</label>
+              <input type="text" name="department" value="{{ profile.department }}" class="form-control" style="font-size: 13px;">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Phone Number</label>
+            <input type="text" name="phone_number" value="{{ profile.phone_number }}" class="form-control" style="font-size: 13px;">
+          </div>
+          <div class="mb-0">
+            <label class="form-label" style="font-size: 11px; font-weight: 600; color: var(--nw-text-muted); text-transform: uppercase;">Bio / Brief</label>
+            <textarea name="bio" rows="3" class="form-control" style="font-size: 13px;">{{ profile.bio }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top: 1px solid var(--nw-border); padding: 16px 24px;">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:var(--nw-accent); border:none;">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

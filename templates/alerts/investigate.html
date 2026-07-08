@@ -126,6 +126,12 @@
           <div style="font-size:16px; font-weight:700; color:var(--nw-accent);">{{ total_requests }}</div>
         </div>
       </div>
+      
+      <div style="height:1px; background:var(--nw-border); margin:15px 0;"></div>
+      
+      <a href="{% url 'export_investigation_csv' %}?ip={{ ip }}" class="btn btn-sm btn-outline-primary w-100" style="font-size:12px; font-weight:600; padding:8px 0; border-radius:6px;">
+        <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i>Export Forensic Dossier (CSV)
+      </a>
     </div>
 
     <!-- IP Metadata Intel -->
@@ -171,6 +177,7 @@
         {% if is_blocked %}
           <form method="post" action="{% url 'unblock_ip' block_record.pk %}">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <button type="submit" class="btn btn-outline-success w-100" style="font-weight:600; font-size:13px;">
               <i class="bi bi-shield-check me-1"></i>Unblock Address
             </button>
@@ -180,6 +187,7 @@
             {% csrf_token %}
             <input type="hidden" name="ip_address" value="{{ ip }}">
             <input type="hidden" name="reason" value="Manually blocked from Forensic Dossier View.">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <button type="submit" class="btn btn-outline-danger w-100" style="font-weight:600; font-size:13px;">
               <i class="bi bi-shield-lock me-1"></i>Block Address (403)
             </button>
@@ -229,7 +237,15 @@
             {% for alert in alerts %}
               <div class="p-2 border rounded" style="font-size:12px; background:var(--nw-bg-page); border-color:var(--nw-border);">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <span class="nw-badge {{ alert.severity_badge }}" style="font-size:9px; padding:2px 5px;">{{ alert.severity }}</span>
+                  {% if alert.severity == 'critical' %}
+                    <span class="nw-badge nw-badge-danger" style="font-size:9px; padding:2px 5px;">Critical</span>
+                  {% elif alert.severity == 'high' %}
+                    <span class="nw-badge nw-badge-orange" style="font-size:9px; padding:2px 5px;">High</span>
+                  {% elif alert.severity == 'medium' %}
+                    <span class="nw-badge nw-badge-warning" style="font-size:9px; padding:2px 5px;">Medium</span>
+                  {% else %}
+                    <span class="nw-badge nw-badge-info" style="font-size:9px; padding:2px 5px;">Low</span>
+                  {% endif %}
                   <span class="text-muted text-end" style="font-size:10px;">{{ alert.timestamp|date:"H:i d M" }}</span>
                 </div>
                 <div style="color:var(--nw-text-primary); font-weight:500;">{{ alert.message }}</div>
@@ -250,7 +266,7 @@
             {% for violation in violations %}
               <div class="p-2 border rounded" style="font-size:12px; background:var(--nw-bg-page); border-color:var(--nw-border);">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <span class="badge bg-warning text-dark" style="font-size:9px; padding:2px 5px;">Rate Violation</span>
+                   <span class="nw-badge nw-badge-warning" style="font-size:9px; padding:2px 5px;">Rate Violation</span>
                   <span class="text-muted text-end" style="font-size:10px;">{{ violation.timestamp|date:"H:i d M" }}</span>
                 </div>
                 <div style="color:var(--nw-text-primary); font-weight:500;">{{ violation.message }}</div>
@@ -360,7 +376,7 @@
     </div>
   </div>
   <div class="col-md-3">
-    <div class="nw-card text-center style" style="padding:15px; background:var(--nw-bg-page); border: 1px dashed var(--nw-border);">
+    <div class="nw-card text-center" style="padding:15px;">
       <div style="font-size:11px; font-weight:600; color:var(--nw-text-muted); text-transform:uppercase; margin-bottom:5px;">Severity Breakdown</div>
       <div class="d-flex justify-content-center gap-2" style="font-size:11px; margin-top:5px;">
         <span class="text-danger fw-bold">🔴{{ severity_counts.critical }}</span>
@@ -394,7 +410,15 @@
                 <a href="{% url 'ip_investigation' %}?ip={{ item.ip }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent); font-size:14px;" title="Triage IP History">
                   {{ item.ip }}
                 </a>
-                <span class="nw-badge {{ item.badge }} ms-2" style="font-size:9px; padding:2px 6px;">{{ item.label }}</span>
+                {% if item.severity == 'critical' %}
+                  <span class="nw-badge nw-badge-danger ms-2" style="font-size:10px; padding:2px 6px;">{{ item.label }}</span>
+                {% elif item.severity == 'high' %}
+                  <span class="nw-badge nw-badge-orange ms-2" style="font-size:10px; padding:2px 6px;">{{ item.label }}</span>
+                {% elif item.severity == 'medium' %}
+                  <span class="nw-badge nw-badge-warning ms-2" style="font-size:10px; padding:2px 6px;">{{ item.label }}</span>
+                {% else %}
+                  <span class="nw-badge nw-badge-info ms-2" style="font-size:10px; padding:2px 6px;">{{ item.label }}</span>
+                {% endif %}
               </div>
               <span class="text-muted" style="font-size:11px;"><i class="bi bi-clock me-1"></i>{{ item.timestamp|date:"H:i:s d M Y" }}</span>
             </div>
@@ -437,9 +461,9 @@
               </div>
             </div>
             {% if offender.unresolved_count > 0 %}
-              <span class="badge bg-danger rounded-pill" style="font-size:10px;">{{ offender.unresolved_count }} Active</span>
+              <span class="nw-badge nw-badge-danger" style="font-size:10px; font-weight:600;">{{ offender.unresolved_count }} Active</span>
             {% else %}
-              <span class="badge bg-success rounded-pill" style="font-size:10px;">Resolved</span>
+              <span class="nw-badge nw-badge-success" style="font-size:10px; font-weight:600;">Resolved</span>
             {% endif %}
           </div>
         {% empty %}

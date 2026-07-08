@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import TrafficLog
+from traffic.models import TrafficLog
 from django.core.cache import cache
 from alerts.models import IPBlocklist, SystemSettings
 from accounts.access import get_user_role
@@ -15,7 +15,7 @@ class TrafficLoggingMiddleware:
         if settings.enable_maintenance_mode:
             role = get_user_role(request.user)
             # Allow login/logout and django admin pages so admins/users don't get trapped
-            allowed_paths = ['/accounts/login/', '/accounts/logout/', '/admin/']
+            allowed_paths = ['/login/', '/logout/', '/admin/']
             is_allowed_path = any(request.path.startswith(p) for p in allowed_paths)
             if role not in ['admin', 'analyst'] and not is_allowed_path:
                 return render(
@@ -25,10 +25,18 @@ class TrafficLoggingMiddleware:
                     status=503
                 )
 
-        # Extract simulated client IP if present (for validation lab simulations), fallback to REMOTE_ADDR
-        ip = request.META.get('HTTP_X_NETWATCH_SIMULATED_IP')
-        if not ip:
-            ip = request.META.get('REMOTE_ADDR')
+        # 1. Extract real client IP (supporting reverse proxies like Nginx/Cloudflare)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            # Direct socket connection
+            ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
+            # Trust simulated IP ONLY for direct local loopback calls (no proxies)
+            if ip in ('127.0.0.1', '::1'):
+                simulated_ip = request.META.get('HTTP_X_NETWATCH_SIMULATED_IP')
+                if simulated_ip:
+                    ip = simulated_ip
 
         # 2. Cache-backed Whitelist Check (implicit whitelist for localhost loopbacks to prevent lockout)
         if ip in ['127.0.0.1', '::1']:
@@ -62,27 +70,10 @@ class TrafficLoggingMiddleware:
                 status=403
             )
 
-        # Store traffic log in database for asynchronous background detection
-        # Exclude dashboard background updates, static assets, and admin paths to prevent false-positives
-        ignored_prefixes = [
-            '/api/',          # Phase 12: Exclude ingest API calls from self-logging
-            '/data/',
-            '/recent-stats/',
-            '/analytics/data/',
-            '/static/',
-            '/admin/',
-            '/accounts/',
-            '/simulation/',
-        ]
-        is_ignored = any(request.path.startswith(prefix) for prefix in ignored_prefixes)
-
-        if not is_ignored:
-            TrafficLog.objects.create(
-                ip_address=ip,
-                url_accessed=request.path,
-                request_method=request.method
-            )
+        # ── Step 3: Mitigation Routing ─────────────────────────────────────
+        # The middleware does NOT log any local traffic from NetWatch itself
+        # to prevent resource consumption and focus exclusively on ShopSafe logs
+        # forwarded via the Ingest API.
         
         response = self.get_response(request)
-  
         return response

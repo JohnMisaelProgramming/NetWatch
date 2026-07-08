@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+{% block page_breadcrumb %}System / Audit Log{% endblock %}
+{% block nav_audit_log %}nw-nav-active{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <div class="nw-card p-3 mb-3">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h5 style="margin:0; font-weight:700; color:var(--nw-text-primary);">
+          <i class="bi bi-journal-text me-2" style="color:var(--nw-accent);"></i>User Activity Audit Trail
+        </h5>
+        <small style="color:var(--nw-text-muted);">{{ total_count }} total entries — Tracks all admin and analyst actions</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="nw-card p-3 mb-3">
+    <form method="GET" style="display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
+      <div>
+        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">Action Type</label>
+        <select name="action" class="form-select form-select-sm" style="min-width:180px;">
+          <option value="">All Actions</option>
+          {% for value, label in action_choices %}
+          <option value="{{ value }}" {% if action_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">User</label>
+        <select name="user" class="form-select form-select-sm" style="min-width:150px;">
+          <option value="">All Users</option>
+          {% for u in users %}
+          <option value="{{ u.id }}" {% if user_filter == u.id %}selected{% endif %}>{{ u.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">From</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--nw-text-muted);">To</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+      </div>
+      <button type="submit" class="btn btn-sm" style="background:var(--nw-accent); color:white; border:none; padding:6px 16px;">
+        <i class="bi bi-funnel me-1"></i>Filter
+      </button>
+      <a href="{% url 'audit_log' %}" class="btn btn-sm btn-outline-secondary" style="padding:6px 16px;">Clear</a>
+    </form>
+  </div>
+
+  <!-- Audit Log Table -->
+  <div class="nw-card" style="overflow-x:auto;">
+    <table class="nw-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:160px;">Timestamp</th>
+          <th style="width:120px;">User</th>
+          <th style="width:160px;">Action</th>
+          <th>Target</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in page_obj %}
+        <tr>
+          <td style="font-family:'Courier New',monospace; font-size:12px; color:var(--nw-text-muted);">
+            {{ log.timestamp|date:"Y-m-d H:i:s" }}
+          </td>
+          <td>
+            <span style="font-weight:600; color:var(--nw-text-primary);">
+              {{ log.user.username|default:"System" }}
+            </span>
+          </td>
+          <td>
+            {% if 'resolve' in log.action %}
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-success);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>{{ log.get_action_display }}</span>
+            {% elif 'block' in log.action %}
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>{{ log.get_action_display }}</span>
+            {% elif 'settings' in log.action %}
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>{{ log.get_action_display }}</span>
+            {% elif 'reopen' in log.action %}
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-warning);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning);"></span>{{ log.get_action_display }}</span>
+            {% else %}
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-info);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-info);"></span>{{ log.get_action_display }}</span>
+            {% endif %}
+          </td>
+          <td style="font-weight:500; color:var(--nw-text-primary); font-size:13px;">{{ log.target }}</td>
+          <td style="color:var(--nw-text-muted); font-size:12px;">{{ log.details|default:"—"|truncatewords:15 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center; padding:40px; color:var(--nw-text-muted);">
+            <i class="bi bi-journal-text" style="font-size:40px; opacity:0.3; display:block; margin-bottom:10px;"></i>
+            No audit log entries found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex; justify-content:center; margin-top:16px;">
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&action={{ action_filter }}&user={{ user_filter }}&date_from={{ date_from }}&date_to={{ date_to }}">&laquo;</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+          <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <li class="page-item"><a class="page-link" href="?page={{ num }}&action={{ action_filter }}&user={{ user_filter }}&date_from={{ date_from }}&date_to={{ date_to }}">{{ num }}</a></li>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&action={{ action_filter }}&user={{ user_filter }}&date_from={{ date_from }}&date_to={{ date_to }}">&raquo;</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

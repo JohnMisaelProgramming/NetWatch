@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 
 from dashboard.views import dashboard_data
-from traffic.ingest_api import ingest_traffic   # External traffic ingest API
+from traffic.ingest_api import ingest_traffic, ingest_event   # External traffic ingest API
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,6 +27,7 @@ urlpatterns = [
     # ShopSafe (Target App) sends traffic metadata here via POST.
     # This must be registered BEFORE the catch-all includes below.
     path('api/ingest/', ingest_traffic, name='api_ingest'),
+    path('api/events/', ingest_event, name='api_ingest_event'),
 
     path('dashboard/data/', dashboard_data, name='dashboard_data'),
     path('', include('dashboard.urls')),   # Dashboard + Analytics
@@ -34,3 +35,10 @@ urlpatterns = [
     path('', include('alerts.urls')),      # Alert Management
     path('', include('reports.urls')),     # Reports & Audit
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

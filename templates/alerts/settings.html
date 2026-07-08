@@ -36,6 +36,21 @@
     50% { transform: scale(1.2); opacity: 1; }
     100% { transform: scale(1); opacity: 0.8; }
   }
+
+  /* Custom visible Switch Toggle styles */
+  .form-switch .form-check-input {
+    background-color: var(--nw-bg-page);
+    border: 1px solid var(--nw-border);
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  }
+  .form-switch .form-check-input:checked {
+    background-color: var(--nw-accent) !important;
+    border-color: var(--nw-accent) !important;
+  }
+  .form-switch .form-check-input:focus {
+    border-color: var(--nw-accent);
+    box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+  }
 </style>
 {% endblock %}
 
@@ -65,7 +80,7 @@
         <h6 style="font-size:12px; font-weight:700; color:var(--nw-text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">System Lockdown Options</h6>
         <div class="form-check form-switch mb-4">
           <input class="form-check-input" type="checkbox" name="enable_maintenance_mode" id="enable_maintenance_mode" {% if settings.enable_maintenance_mode %}checked{% endif %}
-            style="cursor:pointer; background-color:var(--nw-bg-page); border-color:var(--nw-border);">
+            style="cursor:pointer;">
           <label class="form-check-label" for="enable_maintenance_mode" style="font-size:13px; font-weight:600; color:var(--nw-text-primary); cursor:pointer;">Enable Maintenance Mode</label>
           <div class="form-text" style="font-size:11px; color:var(--nw-text-muted);">Blocks all Viewer users. Only Administrators and Security Analysts can bypass lockdown.</div>
         </div>

@@ -22,17 +22,20 @@
     width: 6px;
     height: 6px;
   }
+
   .col-xl-6 div::-webkit-scrollbar-track,
   .col-xl-7 div::-webkit-scrollbar-track,
   .col-xl-5 div::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .col-xl-6 div::-webkit-scrollbar-thumb,
   .col-xl-7 div::-webkit-scrollbar-thumb,
   .col-xl-5 div::-webkit-scrollbar-thumb {
     background: var(--nw-border);
     border-radius: 4px;
   }
+
   .col-xl-6 div::-webkit-scrollbar-thumb:hover,
   .col-xl-7 div::-webkit-scrollbar-thumb:hover,
   .col-xl-5 div::-webkit-scrollbar-thumb:hover {
@@ -45,7 +48,7 @@
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   }
-  
+
   .nw-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
@@ -80,9 +83,20 @@
 
   /* Pulse animation for active alerts */
   @keyframes alert-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.02); opacity: 0.95; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    50% {
+      transform: scale(1.02);
+      opacity: 0.95;
+    }
+
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   .pulse-active {
@@ -91,11 +105,18 @@
 
   /* Fade-in for timeline elements */
   @keyframes nw-fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  
-  #activity-feed-container > div {
+
+  #activity-feed-container>div {
     animation: nw-fade-in 0.3s ease-out forwards;
   }
 
@@ -107,6 +128,31 @@
 
   .nw-table td {
     padding: 12px 20px;
+  }
+
+  /* Helper classes to avoid template tags in style attribute */
+  .text-success-custom {
+    color: var(--nw-success) !important;
+  }
+
+  .text-warning-custom {
+    color: var(--nw-warning) !important;
+  }
+
+  .text-danger-custom {
+    color: var(--nw-danger) !important;
+  }
+
+  .nw-d-none {
+    display: none;
+  }
+
+  .threat-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(239, 68, 68, 0.08), transparent 60%);
+    border-radius: 14px;
+    pointer-events: none;
   }
 </style>
 
@@ -135,14 +181,16 @@
     <div>
       <div style="font-size:12px; color:var(--nw-text-muted); line-height:1;">Engine Status</div>
       <div id="nw-system-status-label"
-        style="font-size:14px; font-weight:600; color:{% if system_status.css == 'success' %}var(--nw-success){% else %}var(--nw-warning){% endif %}; margin-top:2px;">
+        class="{% if system_status.css == 'success' %}text-success-custom{% else %}text-warning-custom{% endif %}"
+        style="font-size:14px; font-weight:600; margin-top:2px;">
         {{ system_status.label }}
       </div>
     </div>
     <div style="width:1px; height:30px; background:var(--nw-border); margin:0 4px;"></div>
     <div>
       <div style="font-size:12px; color:var(--nw-text-muted); line-height:1;">Network Health</div>
-      <div id="nw-network-health-label" style="font-size:14px; font-weight:700; margin-top:2px; display: flex; align-items: center; gap: 5px;">
+      <div id="nw-network-health-label"
+        style="font-size:14px; font-weight:700; margin-top:2px; display: flex; align-items: center; gap: 5px;">
         <span class="spinner-border spinner-border-sm text-secondary" style="width: 12px; height: 12px;"></span>
       </div>
     </div>
@@ -161,17 +209,7 @@
   </div>
 </div>
 
-{# ── Dynamic Health Alert Banner ────────────────────────────────────────── #}
-<div id="nw-health-alert-banner" class="mb-4" style="display: none;">
-  <div class="alert alert-dismissible fade show border-0 d-flex align-items-center gap-3" role="alert" id="nw-health-alert-content" style="border-radius: 12px; padding: 16px 20px;">
-    <i class="" id="nw-health-alert-icon" style="font-size: 24px;"></i>
-    <div class="flex-grow-1">
-      <strong id="nw-health-alert-title" style="font-size: 15px;"></strong>
-      <div id="nw-health-alert-desc" style="font-size: 13px; margin-top: 2px;"></div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="top: auto; padding: 1.25rem;"></button>
-  </div>
-</div>
+{# Health alert banner removed as requested #}
 
 {# ══════════════════════════════════════════════════════════════════════════ #}
 {# SECTION 2 — KPI Cards Row #}
@@ -237,19 +275,17 @@
   {# Cybersecurity relevance: The most critical metric. If this is non-zero, #}
   {# the system has detected an active threat that requires attention. #}
   <div class="col-xl-3 col-md-6">
-    <div class="nw-card" id="kpi-active-alerts-card"
-      style="{% if active_alerts > 0 %}border-color:rgba(239,68,68,0.3);{% endif %}">
+    <div class="nw-card {% if active_alerts > 0 %}border-glow-danger pulse-active{% endif %}"
+      id="kpi-active-alerts-card">
 
       {# If alerts are active, add a subtle red glow to the card #}
-      <div id="kpi-active-alerts-glow"
-        style="position:absolute; inset:0; background:radial-gradient(circle at top right, rgba(239,68,68,0.08), transparent 60%); border-radius:14px; pointer-events:none;{% if active_alerts <= 0 %} display:none;{% endif %}">
+      <div id="kpi-active-alerts-glow" class="threat-glow {% if active_alerts <= 0 %}nw-d-none{% endif %}">
       </div>
 
       <div class="nw-kpi-icon icon-red">
         <i class="bi bi-shield-exclamation"></i>
       </div>
-      <div class="nw-kpi-value" id="kpi-active-alerts"
-        style="{% if active_alerts > 0 %}color:var(--nw-danger); {% endif %}">
+      <div class="nw-kpi-value {% if active_alerts > 0 %}text-danger-custom{% endif %}" id="kpi-active-alerts">
         {{ active_alerts|default:"0" }}
       </div>
       <div class="nw-kpi-label">Active DDoS Alerts</div>
@@ -282,7 +318,7 @@
           <i class="bi bi-speedometer" style="color:var(--nw-accent);"></i>
           Recent Traffic Statistics
         </div>
-        <span class="nw-badge nw-badge-info" id="live-rate-count">0 req/min</span>
+        <span id="live-rate-count" style="font-size:11px; font-weight:600; color:var(--nw-accent); text-transform:uppercase; letter-spacing:0.5px;">0 req/min</span>
       </div>
       <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
       <div style="overflow-x:auto; min-height: 220px; max-height: 380px; overflow-y: auto;">
@@ -299,7 +335,8 @@
             <tr>
               <td colspan="4">
                 <div class="nw-empty-state" style="padding: 40px 0;">
-                  <div class="spinner-border text-primary spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+                  <div class="spinner-border text-primary spinner-border-sm" role="status"
+                    style="width: 1.2rem; height: 1.2rem;"></div>
                   <p style="margin:8px 0 0; font-size:13px;">Initializing Recent Traffic Statistics...</p>
                 </div>
               </td>
@@ -318,13 +355,77 @@
           <i class="bi bi-bar-chart-steps" style="color:var(--nw-info);"></i>
           Top Source IP Widget
         </div>
-        <span class="nw-badge nw-badge-info">Top 10 active sources</span>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-info); text-transform:uppercase; letter-spacing:0.5px;">Top 10 active sources</span>
       </div>
       <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
       <div style="padding: 20px; max-height: 380px; overflow-y: auto;" id="top-source-ip-widget-body">
         <div class="nw-empty-state" style="padding: 40px 0;">
-          <div class="spinner-border text-info spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+          <div class="spinner-border text-info spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;">
+          </div>
           <p style="margin:8px 0 0; font-size:13px;">Initializing Top Source IP data...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Leaflet CSS & JS Linkings ── #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+{# ── SECTION: GIS Threat Visualization Map ── #}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="nw-card p-0" style="overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 14px; border-bottom:1px solid var(--nw-border);">
+        <div class="nw-section-title">
+          <i class="bi bi-globe-americas" style="color:var(--nw-accent);"></i>
+          GIS Real-Time Threat Visualization Map
+        </div>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-danger); text-transform:uppercase; letter-spacing:0.5px;">Live Threat Coordinates Tracking</span>
+      </div>
+
+      <!-- Interactive Leaflet Map Div -->
+      <div id="gis-threat-map" style="height:320px; background:#111827; position:relative; z-index:1;"></div>
+    </div>
+  </div>
+</div>
+
+{# ── SECTION: Threat Intelligence Dashboard (Top Attackers & URLs) ── #}
+<div class="row g-3 mb-4">
+  <!-- Top Attacking IPs Card -->
+  <div class="col-xl-6">
+    <div class="nw-card p-0" style="overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 14px; border-bottom:1px solid var(--nw-border);">
+        <div class="nw-section-title">
+          <i class="bi bi-shield-slash" style="color:var(--nw-danger);"></i>
+          Top Attacking Sources (Threat Intel)
+        </div>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-danger); text-transform:uppercase; letter-spacing:0.5px;">IP Rank</span>
+      </div>
+      <div style="padding:20px; min-height:180px;" id="top-attackers-list">
+        <div class="nw-empty-state" style="padding:40px 0;">
+          <div class="spinner-border text-danger spinner-border-sm" role="status"></div>
+          <p style="margin-top:10px;">Compiling attackers ranking...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Most Targeted Endpoints Card -->
+  <div class="col-xl-6">
+    <div class="nw-card p-0" style="overflow:hidden;">
+      <div class="nw-section-header" style="padding:18px 20px 14px; border-bottom:1px solid var(--nw-border);">
+        <div class="nw-section-title">
+          <i class="bi bi-bullseye" style="color:var(--nw-warning);"></i>
+          Most Targeted Endpoints (POST Attacks)
+        </div>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-warning); text-transform:uppercase; letter-spacing:0.5px;">POST Rank</span>
+      </div>
+      <div style="padding:20px; min-height:180px;" id="top-urls-list">
+        <div class="nw-empty-state" style="padding:40px 0;">
+          <div class="spinner-border text-warning spinner-border-sm" role="status"></div>
+          <p style="margin-top:10px;">Resolving targets ranking...</p>
         </div>
       </div>
     </div>
@@ -348,7 +449,7 @@
           <i class="bi bi-list-ul" style="color:var(--nw-accent);"></i>
           Recent Traffic Activity
         </div>
-        <span class="nw-badge nw-badge-info">Last 10 Requests</span>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-accent); text-transform:uppercase; letter-spacing:0.5px;">Last 10 Requests</span>
       </div>
 
       {# Horizontal divider between header and table #}
@@ -371,7 +472,8 @@
 
               {# IP Address — monospace cyan styling for easy reading #}
               <td>
-                <a href="{% url 'ip_investigation' %}?ip={{ log.ip_address }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">{{ log.ip_address }}</a>
+                <a href="{% url 'ip_investigation' %}?ip={{ log.ip_address }}" class="nw-ip fw-bold"
+                  style="text-decoration:none; color:var(--nw-accent);">{{ log.ip_address }}</a>
               </td>
 
               {# HTTP Method — color-coded badge (GET=green, POST=blue) #}
@@ -437,15 +539,15 @@
           <i class="bi bi-bell-fill" style="color:var(--nw-danger);"></i>
           Recent Alerts
         </div>
-        {# Dynamic badge: red if active alerts exist, gray if all clear #}
+        {# Dynamic text indicator: red if active alerts exist, green if all clear #}
         <span id="recent-alerts-badge">
           {% if active_alerts > 0 %}
-          <span class="nw-badge nw-badge-danger">
+          <span style="font-size:11px; font-weight:600; color:var(--nw-danger); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:4px;">
             <i class="bi bi-exclamation-circle-fill"></i>
             {{ active_alerts }} Active
           </span>
           {% else %}
-          <span class="nw-badge nw-badge-success">
+          <span style="font-size:11px; font-weight:600; color:var(--nw-success); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:4px;">
             <i class="bi bi-check-circle-fill"></i>
             All Clear
           </span>
@@ -470,7 +572,8 @@
             {% for alert in recent_alerts %}
             <tr>
               <td>
-                <a href="{% url 'ip_investigation' %}?ip={{ alert.ip_address }}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">{{ alert.ip_address }}</a>
+                <a href="{% url 'ip_investigation' %}?ip={{ alert.ip_address }}" class="nw-ip fw-bold"
+                  style="text-decoration:none; color:var(--nw-accent);">{{ alert.ip_address }}</a>
                 <div style="font-size:11px; color:var(--nw-text-muted); margin-top:2px;">
                   {{ alert.request_count }} req/min
                 </div>
@@ -561,13 +664,14 @@
           <i class="bi bi-clock-history" style="color:var(--nw-accent);"></i>
           Recent SOC Timeline
         </div>
-        <span class="nw-badge nw-badge-info">Latest Network Activity</span>
+        <span style="font-size:11px; font-weight:600; color:var(--nw-accent); text-transform:uppercase; letter-spacing:0.5px;">Latest Network Activity</span>
       </div>
       <div style="height:1px; background:var(--nw-border); margin:14px 0 0;"></div>
       <div style="padding: 20px 24px; max-height: 400px; overflow-y: auto;">
         <div id="activity-feed-container" class="position-relative" style="min-height: 120px;">
           <div class="nw-empty-state" style="padding: 40px 0;">
-            <div class="spinner-border text-primary spinner-border-sm" role="status" style="width: 1.2rem; height: 1.2rem;"></div>
+            <div class="spinner-border text-primary spinner-border-sm" role="status"
+              style="width: 1.2rem; height: 1.2rem;"></div>
             <p style="margin:8px 0 0; font-size:13px;">Initializing Recent SOC Timeline...</p>
           </div>
         </div>
@@ -687,13 +791,13 @@
     }
 
     function statusBadge(status) {
-      const badges = {
-        normal: '<span class="nw-badge nw-badge-success"><i class="bi bi-shield-check"></i> Normal</span>',
-        alert: '<span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-octagon-fill"></i> Alerting</span>',
-        rate_limit: '<span class="nw-badge nw-badge-warning"><i class="bi bi-speedometer2"></i> Rate-Limited</span>',
-        blocked: '<span class="nw-badge nw-badge-secondary"><i class="bi bi-slash-circle"></i> Blocked</span>',
+      const indicators = {
+        normal: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-primary);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>Normal</span>',
+        alert: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Alerting</span>',
+        rate_limit: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-warning); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning);"></span>Rate-Limited</span>',
+        blocked: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>Blocked</span>',
       };
-      return badges[status] || '<span class="nw-badge nw-badge-secondary">Unknown</span>';
+      return indicators[status] || '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>Unknown</span>';
     }
 
     function renderTrafficRows(rows) {
@@ -772,13 +876,13 @@
     }
 
     function riskBadge(risk) {
-      const badges = {
-        low: '<span class="nw-badge nw-badge-success" style="font-size:10px; padding:2px 6px;">Low Risk</span>',
-        medium: '<span class="nw-badge nw-badge-warning" style="font-size:10px; padding:2px 6px;">Med Risk</span>',
-        high: '<span class="nw-badge nw-badge-orange" style="font-size:10px; padding:2px 6px;">High Risk</span>',
-        critical: '<span class="nw-badge nw-badge-danger" style="font-size:10px; padding:2px 6px;">Critical Risk</span>',
+      const indicators = {
+        low: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-success);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-success);"></span>Low Risk</span>',
+        medium: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-warning);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning);"></span>Med Risk</span>',
+        high: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-orange); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-orange);"></span>High Risk</span>',
+        critical: '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-danger); font-weight:600;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger);"></span>Critical Risk</span>',
       };
-      return badges[risk] || '<span class="nw-badge nw-badge-secondary" style="font-size:10px; padding:2px 6px;">Unknown</span>';
+      return indicators[risk] || '<span style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--nw-text-muted);"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-text-muted);"></span>Unknown</span>';
     }
 
     function renderTopIpWidget(topIps) {
@@ -792,7 +896,7 @@
       return topIps.map(function (item) {
         let progressClass = 'bg-primary';
         if (item.risk === 'critical') progressClass = 'bg-danger';
-        else if (item.risk === 'high') progressClass = 'bg-warning'; 
+        else if (item.risk === 'high') progressClass = 'bg-warning';
         else if (item.risk === 'medium') progressClass = 'bg-warning text-dark';
 
         return `<div class="mb-3">
@@ -837,7 +941,11 @@
         }
       }
       if (glow) {
-        glow.style.display = count > 0 ? 'block' : 'none';
+        if (count > 0) {
+          glow.classList.remove('nw-d-none');
+        } else {
+          glow.classList.add('nw-d-none');
+        }
       }
       if (value) {
         value.textContent = count;
@@ -850,8 +958,8 @@
       }
       if (badge) {
         badge.innerHTML = count > 0
-          ? `<span class="nw-badge nw-badge-danger"><i class="bi bi-exclamation-circle-fill"></i> ${count} Active</span>`
-          : '<span class="nw-badge nw-badge-success"><i class="bi bi-check-circle-fill"></i> All Clear</span>';
+          ? `<span style="font-size:11px; font-weight:600; color:var(--nw-danger); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-exclamation-circle-fill"></i> ${count} Active</span>`
+          : '<span style="font-size:11px; font-weight:600; color:var(--nw-success); text-transform:uppercase; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:4px;"><i class="bi bi-check-circle-fill"></i> All Clear</span>';
       }
 
       const navBadge = document.querySelector('.nw-nav-badge');
@@ -874,7 +982,7 @@
       }
 
       let html = `<div style="position: absolute; left: 19px; top: 10px; bottom: 10px; width: 2px; background-color: var(--nw-border); z-index: 1;"></div>`;
-      
+
       html += feed.map(function (item) {
         let iconBg = 'rgba(59, 130, 246, 0.1)';
         let iconColor = 'var(--nw-accent)';
@@ -938,6 +1046,51 @@
         feedContainer.innerHTML = renderActivityFeed(data.activity_feed);
       }
 
+      // Update Threat GIS Markers
+      if (data.threat_locations) {
+        updateMapMarkers(data.threat_locations);
+      }
+
+      // Update Top Attackers List Widget
+      const attackersContainer = document.getElementById('top-attackers-list');
+      if (attackersContainer && data.top_attackers) {
+        if (data.top_attackers.length === 0) {
+          attackersContainer.innerHTML = `<div class="text-center text-muted" style="font-size:13px; padding-top:90px;">No attacking sources detected.</div>`;
+        } else {
+          attackersContainer.innerHTML = data.top_attackers.map(function (item) {
+            return `
+              <div class="d-flex align-items-center justify-content-between mb-2" style="padding: 4px 0;">
+                <a href="/alerts/investigate/?ip=${item.ip_address}" class="nw-ip fw-bold" style="text-decoration:none; color:var(--nw-accent);">${item.ip_address}</a>
+                <div class="d-flex align-items-center" style="font-size:12px; color:var(--nw-text-muted);">
+                  <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-danger); margin-right:8px;"></span>
+                  <span>${item.total} Incident${item.total > 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Update Top Targeted URLs Widget
+      const urlsContainer = document.getElementById('top-urls-list');
+      if (urlsContainer && data.top_urls) {
+        if (data.top_urls.length === 0) {
+          urlsContainer.innerHTML = `<div class="text-center text-muted" style="font-size:13px; padding-top:40px;">No target data available.</div>`;
+        } else {
+          urlsContainer.innerHTML = data.top_urls.map(function (item) {
+            return `
+              <div class="d-flex align-items-center justify-content-between mb-2" style="padding: 4px 0;">
+                <span class="nw-url text-truncate" style="max-width: 75%;">${item.url_accessed}</span>
+                <div class="d-flex align-items-center" style="font-size:12px; color:var(--nw-text-muted);">
+                  <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:var(--nw-warning); margin-right:8px;"></span>
+                  <span>${item.total} POST${item.total > 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
       updateTimestamp();
     }
 
@@ -970,6 +1123,8 @@
         if (health.level === 'normal') {
           alertBanner.style.display = 'none';
         } else {
+          // Reset banner display states
+          alertBanner.style.opacity = '1';
           alertBanner.style.display = 'block';
           alertContent.style.backgroundColor = health.bg;
           alertContent.style.border = `1px solid ${health.border}`;
@@ -977,6 +1132,19 @@
           alertIcon.className = `bi ${health.icon}`;
           alertTitle.textContent = `System Threat Level: ${health.label.toUpperCase()}`;
           alertDesc.textContent = health.message;
+
+          // Auto-hide after 5 seconds with a smooth fade-out transition
+          if (window.threatBannerTimeout) {
+            clearTimeout(window.threatBannerTimeout);
+          }
+          window.threatBannerTimeout = setTimeout(function () {
+            alertBanner.style.transition = 'opacity 0.5s ease';
+            alertBanner.style.opacity = '0';
+            setTimeout(function () {
+              alertBanner.style.display = 'none';
+              alertBanner.style.opacity = '1'; // Reset opacity for next trigger
+            }, 500);
+          }, 5000);
         }
       }
     }
@@ -1036,7 +1204,70 @@
         });
     }
 
+    // GIS Threat Map Initialization
+    let threatMap;
+    let mapMarkers = [];
+
+    function initThreatMap() {
+      const mapContainer = document.getElementById('gis-threat-map');
+      if (!mapContainer) return;
+
+      // Set generous horizontal wrapping bounds to allow zooming/panning to Alaska, Russia, and NZ cleanly
+      const maxBounds = L.latLngBounds(L.latLng(-90, -360), L.latLng(90, 360));
+      threatMap = L.map('gis-threat-map', {
+        attributionControl: false,
+        minZoom: 1.5,
+        maxZoom: 18,
+        maxBounds: maxBounds,
+        maxBoundsViscosity: 0.1,
+        worldCopyJump: true
+      }).setView([15, 0], 1.5);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 18,
+        noWrap: false
+      }).addTo(threatMap);
+    }
+
+    function updateMapMarkers(locations) {
+      if (!threatMap) return;
+
+      mapMarkers.forEach(m => threatMap.removeLayer(m));
+      mapMarkers = [];
+
+      locations.forEach(function (loc) {
+        let markerColor = '#ef4444';
+        if (loc.severity === 'high') markerColor = '#f97316';
+        if (loc.severity === 'medium') markerColor = '#f59e0b';
+        if (loc.severity === 'low') markerColor = '#3b82f6';
+
+        const circleMarker = L.circleMarker([loc.lat, loc.lon], {
+          radius: 8,
+          fillColor: markerColor,
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 0.9,
+          fillOpacity: 0.85
+        }).addTo(threatMap);
+
+        const popupContent = `
+          <div style="font-family:'Inter',sans-serif; font-size:12px; color:#1e293b; padding:2px; line-height:1.4;">
+            <div style="font-weight:700; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:4px; color:${markerColor};">
+              [${loc.severity.toUpperCase()}] ${loc.type}
+            </div>
+            <b>IP Address:</b> ${loc.ip}<br>
+            <b>Location:</b> ${loc.city}, ${loc.region}, ${loc.country}<br>
+            <b>Coordinates:</b> ${loc.lat}, ${loc.lon}<br>
+            <b>Reason:</b> ${loc.reason}
+          </div>
+        `;
+        circleMarker.bindPopup(popupContent);
+        mapMarkers.push(circleMarker);
+      });
+    }
+
     updateTimestamp();
+    initThreatMap();
     refreshDashboard();
     setInterval(refreshDashboard, DASHBOARD_POLL_MS);
   })();

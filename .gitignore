@@ -1,19 +1,37 @@
 # Byte-compiled / optimized / DLL files
-**/__pycache__/
+__pycache__/
 *.py[cod]
 *$py.class
 
-# Database
-*.sqlite3
-db.sqlite3
-db.sqlite3-journal
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vs/
+pyrightconfig.json
 
-# Environments
+# Local environments and configuration secrets
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 
-# Static files
+# Django database & media
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-shm
+db.sqlite3-wal
 staticfiles/
+media/
+
+# Logs
+*.log
+netwatch.log
+full_test.log
+sidebar_test.log
+sidebar_test_utf8.txt

@@ -479,7 +479,7 @@ def export_alerts_pdf(request):
         }
 
         row_colors = []
-        for i, alert in enumerate(alerts_qs.order_by('-timestamp'), start=1):
+        for i, alert in enumerate(alerts_qs.order_by('-timestamp')[:500], start=1):
             data.append([
                 str(alert.id),
                 alert.ip_address,

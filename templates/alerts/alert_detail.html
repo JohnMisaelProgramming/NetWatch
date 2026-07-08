@@ -79,6 +79,7 @@
 
 <!-- ── Back + Resolve Buttons ─────────────────────────────────────────── -->
 <div class="d-flex align-items-center justify-content-between mb-4">
+  <!-- Left Side: Back button -->
   <a href="{% url 'alerts_list' %}"
     style="display:flex; align-items:center; gap:8px; color:var(--nw-text-muted);
     text-decoration:none; font-size:13px; font-weight:500; transition:color 0.2s;"
@@ -87,39 +88,63 @@
     <i class="bi bi-arrow-left"></i> Back to Alert List
   </a>
 
-  {% if not alert.resolved %}
-  <form method="post" action="{% url 'resolve_alert' alert.pk %}"
-    onsubmit="return confirm('Mark this alert as resolved?')">
-    {% csrf_token %}
-    <input type="hidden" name="next" value="alerts_list" />
-    <button type="submit"
-      style="background:var(--nw-success); color:white; border:none; border-radius:8px;
-      padding:10px 20px; font-size:13px; font-weight:600; cursor:pointer;
-      font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px;
-      transition:background 0.2s;"
-      onmouseover="this.style.background='#16a34a'"
-      onmouseout="this.style.background='var(--nw-success)'">
-      <i class="bi bi-check-circle-fill"></i> Mark as Resolved
-    </button>
-  </form>
-  {% else %}
-  <span class="nw-badge nw-badge-success" style="padding:8px 16px; font-size:12px; height: 38px; display:flex; align-items:center;">
-    <i class="bi bi-check-circle-fill"></i> Already Resolved
-  </span>
-  {% endif %}
+  <!-- Right Side: Action Buttons grouped together -->
+  <div class="d-flex align-items-center gap-2">
+    {% if not alert.resolved %}
+    <form method="post" action="{% url 'resolve_alert' alert.pk %}"
+      onsubmit="return confirm('Mark this alert as resolved?')">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="alerts_list" />
+      <button type="submit"
+        style="background:var(--nw-success); color:white; border:none; border-radius:8px;
+        padding:10px 20px; font-size:13px; font-weight:600; cursor:pointer;
+        font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px;
+        transition:background 0.2s;"
+        onmouseover="this.style.background='#16a34a'"
+        onmouseout="this.style.background='var(--nw-success)'">
+        <i class="bi bi-check-circle-fill"></i> Mark as Resolved
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{% url 'reopen_alert' alert.pk %}"
+      style="display:inline;"
+      onsubmit="return confirm('Reopen alert #{{ alert.id }} for investigation?')">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="alert_detail" />
+      <button type="submit" class="btn btn-warning"
+        style="border-radius:8px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer;
+        font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px; border:none; color:var(--nw-text-primary);">
+        <i class="bi bi-arrow-counterclockwise"></i> Reopen Alert
+      </button>
+    </form>
+    {% endif %}
 
-  {% if is_admin_user %}
-  <form method="post" action="{% url 'block_ip' alert.pk %}"
-    onsubmit="return confirm('Add IP {{ alert.ip_address }} to blocklist?')">
-    {% csrf_token %}
-    <input type="hidden" name="next" value="alert_detail" />
-    <button type="submit" class="btn btn-outline-danger"
-      style="border-radius:8px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer;
-      font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px;">
-      <i class="bi bi-shield-lock-fill"></i> Block IP
-    </button>
-  </form>
-  {% endif %}
+    {% if is_admin_user %}
+      {% if is_blocked %}
+      <form method="post" action="{% url 'unblock_ip_by_ip' alert.ip_address %}"
+        onsubmit="return confirm('Remove IP {{ alert.ip_address }} from blocklist?')">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="alert_detail" />
+        <button type="submit" class="btn btn-danger"
+          style="border-radius:8px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer;
+          font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px; border:none;">
+          <i class="bi bi-shield-check"></i> Unblock IP
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="{% url 'block_ip' alert.pk %}"
+        onsubmit="return confirm('Add IP {{ alert.ip_address }} to blocklist?')">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="alert_detail" />
+        <button type="submit" class="btn btn-outline-danger"
+          style="border-radius:8px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer;
+          font-family:'Inter',sans-serif; display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-shield-lock-fill"></i> Block IP
+        </button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </div>
 </div>
 
 <!-- ── Repeat Offender Banner ─────────────────────────────────────────── -->
@@ -207,6 +232,20 @@
           {% endif %}
         </div>
       </div>
+      {% if alert.resolved %}
+      <div class="detail-row">
+        <div class="detail-key">Resolved By</div>
+        <div class="detail-value" style="font-weight:600; color:var(--nw-text-primary);">
+          {{ alert.resolved_by.username|default:"System" }}
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-key">Resolved At</div>
+        <div class="detail-value nw-timestamp" style="font-size:13px;">
+          {{ alert.resolved_at|date:"l, d F Y — H:i:s" }} UTC
+        </div>
+      </div>
+      {% endif %}
       <div class="detail-row">
         <div class="detail-key">Detected At</div>
         <div class="detail-value nw-timestamp" style="font-size:13px;">
@@ -225,6 +264,48 @@
         <div class="detail-value">
           <div class="alert-message-box">{{ alert.message }}</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Analyst Investigation Notes -->
+    <div class="detail-section">
+      <div class="detail-section-header">
+        <div class="detail-section-title">
+          <i class="bi bi-chat-left-text-fill" style="color:var(--nw-accent);"></i>
+          Investigation Notes
+        </div>
+        <span class="nw-badge nw-badge-info">{{ notes|length }} note{{ notes|pluralize }}</span>
+      </div>
+
+      <!-- Notes List -->
+      <div style="max-height: 250px; overflow-y: auto; padding: 10px 0;">
+        {% for note in notes %}
+        <div style="padding:10px 20px; border-bottom:1px solid var(--nw-border); font-size:13px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:600; color:var(--nw-text-primary);">{{ note.author.username }}</span>
+            <span style="font-size:11px; color:var(--nw-text-muted);">{{ note.created_at|date:"d M Y H:i" }}</span>
+          </div>
+          <div style="color:var(--nw-text-primary); line-height:1.4;">{{ note.content }}</div>
+        </div>
+        {% empty %}
+        <div class="nw-empty-state" style="padding:24px;">
+          <p style="font-size:12px; color:var(--nw-text-muted); margin:0;">No notes added yet. Document your threat analysis findings below.</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Note Add Form -->
+      <div style="padding:16px 20px; background:var(--nw-bg-page); border-top:1px solid var(--nw-border);">
+        <form method="post" action="{% url 'add_alert_note' alert.pk %}">
+          {% csrf_token %}
+          <div style="display:flex; gap:8px;">
+            <input type="text" name="note_content" placeholder="Add analysis comment..." required
+                   style="flex:1; border:1px solid var(--nw-border); border-radius:6px; padding:6px 12px; font-size:13px; background:var(--nw-bg-card); color:var(--nw-text-primary);" />
+            <button type="submit" class="btn btn-sm btn-primary" style="background:var(--nw-accent); border:none; padding:6px 14px; border-radius:6px; font-size:12px; font-weight:600;">
+              Add
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 

@@ -1,8 +1,11 @@
+import logging
 from datetime import timedelta
 from django.utils import timezone
 from django.core.cache import cache
 from traffic.models import TrafficLog
-from .models import Alert, RateLimitViolation, SystemSettings, IPBlocklist
+from alerts.models import Alert, RateLimitViolation, SystemSettings, IPBlocklist
+
+logger = logging.getLogger(__name__)
 
 
 def get_severity(count, settings):
@@ -37,7 +40,7 @@ def check_and_perform_auto_block(ip_address, count, settings):
     if settings.enable_auto_blocking and count >= settings.auto_block_threshold:
         if ip_address in ['127.0.0.1', '::1']:
             return  # Loopback bypass!
-        from .models import IPWhitelist
+        from alerts.models import IPWhitelist
         if IPWhitelist.objects.filter(ip_address=ip_address).exists():
             return  # Whitelist bypass!
 
@@ -233,3 +236,107 @@ def detect_rate_limit_violation(ip_address, path, request_method, settings=None)
         )
 
     return violation
+
+
+def send_admin_email_alert(alert):
+    """
+    Sends an email alert notification to administrators for High and Critical threat levels.
+    """
+    if alert.severity not in [Alert.SEVERITY_HIGH, Alert.SEVERITY_CRITICAL]:
+        return
+
+    from django.core.mail import send_mail
+    subject = f"NetWatch SECURITY ALERT: [{alert.severity.upper()}] Threat Detected!"
+    message = (
+        f"An incident of level {alert.severity.upper()} has been detected by NetWatch.\n\n"
+        f"Details:\n"
+        f"- Alert ID: #{alert.id}\n"
+        f"- Detection Type: {alert.get_detection_type_display()}\n"
+        f"- Attacker IP: {alert.ip_address}\n"
+        f"- Volume / Counts: {alert.request_count}\n"
+        f"- System Message: {alert.message}\n"
+        f"- Timestamp: {alert.timestamp}\n\n"
+        f"Please check the NetWatch security dashboard immediately to analyze logs and resolve this threat."
+    )
+    try:
+        send_mail(
+            subject,
+            message,
+            'security-alert@netwatch.local',
+            ['admin@netwatch.local'],
+            fail_silently=False
+        )
+        print(f"\n[EMAIL SIMULATOR - NetWatch Alert] Sent alert to admin@netwatch.local: {subject}\n")
+    except Exception as e:
+        logger.error(f"Failed to send security alert email: {e}")
+
+
+def detect_security_events(ip_address, settings=None):
+    """
+    Analyzes SecurityEvent logs for a given IP in the sliding window.
+    - Triggers 'failed_login' spike warning if failures >= 3.
+    - Triggers 'brute_force' threat alert if failures >= 5.
+    - Auto-blocks IP if auto-blocking settings are enabled.
+    - Sends administrator alerts for critical severity incidents.
+    """
+    if settings is None:
+        settings = SystemSettings.get_settings()
+
+    time_window = settings.time_window_minutes
+    window_start = timezone.now() - timedelta(minutes=time_window)
+
+    from alerts.models import SecurityEvent, IPWhitelist, IPBlocklist
+
+    # 1. Count failed login events for this IP
+    failed_count = SecurityEvent.objects.filter(
+        ip_address=ip_address,
+        event_type='failed_login',
+        timestamp__gte=window_start
+    ).count()
+
+    if failed_count <= 0:
+        return
+
+    # 2. Brute Force Attack Detection (failed logins >= 5)
+    if failed_count >= 5:
+        # Automatic IP Blocking
+        if settings.enable_auto_blocking:
+            if ip_address not in ['127.0.0.1', '::1'] and not IPWhitelist.objects.filter(ip_address=ip_address).exists():
+                if not IPBlocklist.objects.filter(ip_address=ip_address).exists():
+                    IPBlocklist.objects.create(
+                        ip_address=ip_address,
+                        reason=f"Automatically blocked: excessive login failures ({failed_count}) indicating active brute force.",
+                        added_by=None
+                    )
+
+        # Create Brute Force alert if not active already
+        if not _active_alert_exists(ip_address, Alert.DETECTION_BRUTE_FORCE):
+            severity = Alert.SEVERITY_CRITICAL if failed_count >= 10 else Alert.SEVERITY_HIGH
+            alert = Alert.objects.create(
+                ip_address=ip_address,
+                request_count=failed_count,
+                severity=severity,
+                detection_type=Alert.DETECTION_BRUTE_FORCE,
+                message=(
+                    f"Active Brute Force attack detected from IP {ip_address}. "
+                    f"Attempts in last {time_window} minute(s): {failed_count}. "
+                    f"Threshold: 5. Severity: {severity.upper()}"
+                )
+            )
+            send_admin_email_alert(alert)
+
+    # 3. Failed Login Spike Detection (failed logins >= 3)
+    elif failed_count >= 3:
+        if not _active_alert_exists(ip_address, Alert.DETECTION_FAILED_LOGIN):
+            alert = Alert.objects.create(
+                ip_address=ip_address,
+                request_count=failed_count,
+                severity=Alert.SEVERITY_MEDIUM,
+                detection_type=Alert.DETECTION_FAILED_LOGIN,
+                message=(
+                    f"Failed Login Spike detected from IP {ip_address}. "
+                    f"Failed logins in last {time_window} minute(s): {failed_count}. "
+                    f"Threshold: 3. Severity: MEDIUM"
+                )
+            )
+            send_admin_email_alert(alert)

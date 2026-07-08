@@ -209,14 +209,6 @@
     <div class="nw-brand-title">NetWatch</div>
     <div class="nw-brand-subtitle">Real-Time DDoS Detection & Alerting Dashboard</div>
 
-    <!-- Error Alerts -->
-    {% if error %}
-    <div class="nw-alert">
-      <i class="bi bi-exclamation-triangle-fill" style="margin-top: 2px;"></i>
-      <div>{{ error }}</div>
-    </div>
-    {% endif %}
-
     <!-- Form -->
     <form method="POST">
       {% csrf_token %}
@@ -225,20 +217,27 @@
       <div class="mb-3">
         <label for="username" class="form-label">Username</label>
         <div class="input-group">
-          <input type="text" id="username" name="username" class="form-control" placeholder="Enter username" autocomplete="username" required>
+          <input type="text" id="username" name="username" class="form-control {% if error %}is-invalid{% endif %}" placeholder="Enter username" autocomplete="username" required>
         </div>
+        {% if error %}
+          <div class="text-danger small mt-1" style="font-size: 13px;"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ error }}</div>
+        {% endif %}
       </div>
 
       <!-- Password -->
       <div class="mb-4">
         <label for="password" class="form-label">Password</label>
         <div class="input-group">
-          <input type="password" id="password" name="password" class="form-control" placeholder="Enter password" autocomplete="current-password" required style="padding-right: 40px;">
+          <input type="password" id="password" name="password" class="form-control {% if error %}is-invalid{% endif %}" placeholder="Enter password" autocomplete="current-password" required style="padding-right: 40px;">
           <button type="button" id="password-toggle" class="nw-toggle-btn" aria-label="Toggle password visibility">
             <i class="bi bi-eye-fill" id="toggle-icon"></i>
           </button>
         </div>
+        {% if error %}
+          <div class="text-danger small mt-1" style="font-size: 13px;"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ error }}</div>
+        {% endif %}
       </div>
+
 
       <!-- Remember Me & Reset Link Row -->
       <div class="d-flex align-items-center justify-content-between mb-4" style="font-size: 13px;">

@@ -3,11 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from django.utils import timezone
 
 from accounts.access import role_required
-from .models import Alert, SystemSettings, IPBlocklist, RateLimitViolation, SimulationRun, IPWhitelist
+from alerts.models import Alert, SystemSettings, IPBlocklist, RateLimitViolation, SimulationRun, IPWhitelist, AuditLog, AlertNote
 from traffic.models import TrafficLog
-from .simulation import start_simulation_thread, stop_simulation_thread
+from alerts.simulation import start_simulation_thread, stop_simulation_thread
 
 
 @role_required('admin', 'analyst', redirect_url='dashboard', message='Access Denied: Alert management is limited to Administrators and Security Analysts.')
@@ -68,6 +69,9 @@ def alerts_list(request):
         'active_count':   Alert.objects.filter(resolved=False).count(),
         'resolved_count': Alert.objects.filter(resolved=True).count(),
         'critical_count': Alert.objects.filter(severity='critical', resolved=False).count(),
+
+        # Blocked IPs for rendering actions correctly
+        'blocked_ips':    set(IPBlocklist.objects.values_list('ip_address', flat=True)),
     }
     return render(request, 'alerts/alerts_list.html', context)
 
@@ -104,12 +108,17 @@ def alert_detail(request, pk):
     # Is this a repeat offender? (more than 1 alert from this IP)
     is_repeat = Alert.objects.filter(ip_address=alert.ip_address).count() > 1
 
+    # Check if the IP is currently blocked
+    is_blocked = IPBlocklist.objects.filter(ip_address=alert.ip_address).exists()
+
     context = {
         'alert':            alert,
         'related_traffic':  related_traffic,
         'ip_alert_history': ip_alert_history,
         'is_repeat':        is_repeat,
         'traffic_count':    TrafficLog.objects.filter(ip_address=alert.ip_address).count(),
+        'notes':            alert.notes.select_related('author').all(),
+        'is_blocked':       is_blocked,
     }
     return render(request, 'alerts/alert_detail.html', context)
 
@@ -129,7 +138,17 @@ def resolve_alert(request, pk):
     if request.method == 'POST':
         alert = get_object_or_404(Alert, pk=pk)
         alert.resolved = True
+        alert.resolved_by = request.user
+        alert.resolved_at = timezone.now()
         alert.save()
+
+        # Create audit log entry
+        AuditLog.objects.create(
+            user=request.user,
+            action='resolve_alert',
+            target=f'Alert #{pk} — IP {alert.ip_address}',
+            details=f'{alert.get_severity_display()} severity, {alert.request_count} requests',
+        )
 
         messages.success(
             request,
@@ -175,6 +194,33 @@ def settings_view(request):
             enable_auto_blocking = 'enable_auto_blocking' in request.POST
             auto_block_threshold = int(request.POST.get('auto_block_threshold', 100))
             enable_maintenance_mode = 'enable_maintenance_mode' in request.POST
+            data_retention_days = int(request.POST.get('data_retention_days', 90))
+
+            # ── Input Validation ─────────────────────────────────────────
+            errors = []
+            if threshold <= 0:
+                errors.append('Request threshold must be greater than 0.')
+            if time_window <= 0:
+                errors.append('Time window must be greater than 0.')
+            if rate_limit_threshold <= 0:
+                errors.append('Rate limit threshold must be greater than 0.')
+            if rate_limit_high_mult < 1.0:
+                errors.append('Rate limit HIGH multiplier must be at least 1.0.')
+            if rate_limit_critical_mult < 1.0:
+                errors.append('Rate limit CRITICAL multiplier must be at least 1.0.')
+            if rate_limit_critical_mult <= rate_limit_high_mult:
+                errors.append('CRITICAL multiplier must be greater than HIGH multiplier.')
+            if not (severity_medium < severity_high < severity_critical):
+                errors.append('Severity thresholds must be in ascending order: Medium < High < Critical.')
+            if auto_block_threshold <= 0:
+                errors.append('Auto-block threshold must be greater than 0.')
+            if data_retention_days < 0:
+                errors.append('Data retention days cannot be negative (use 0 for unlimited).')
+
+            if errors:
+                for err in errors:
+                    messages.error(request, err)
+                return redirect('settings')
 
             settings.request_threshold = threshold
             settings.time_window_minutes = time_window
@@ -190,8 +236,19 @@ def settings_view(request):
             settings.enable_auto_blocking = enable_auto_blocking
             settings.auto_block_threshold = auto_block_threshold
             settings.enable_maintenance_mode = enable_maintenance_mode
+            settings.data_retention_days = data_retention_days
             
             settings.save()
+
+            # Audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action='update_settings',
+                target='System Settings',
+                details=f'Threshold={threshold}, Rate Limit={rate_limit_threshold}, '
+                        f'Auto-block={enable_auto_blocking}, Maintenance={enable_maintenance_mode}, '
+                        f'Retention={data_retention_days}d',
+            )
             
             messages.success(request, 'System settings updated successfully.')
             return redirect('settings')
@@ -281,6 +338,12 @@ def whitelist_add_ip(request):
                     reason=reason or 'Manually whitelisted by Administrator.',
                     added_by=request.user
                 )
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='whitelist_ip',
+                    target=ip_address,
+                    details=reason or 'Manually whitelisted',
+                )
                 messages.success(request, f'IP address {ip_address} has been whitelisted.')
         else:
             messages.error(request, 'Please provide a valid IP address.')
@@ -297,6 +360,11 @@ def whitelist_delete_ip(request, pk):
         item = get_object_or_404(IPWhitelist, pk=pk)
         ip = item.ip_address
         item.delete()
+        AuditLog.objects.create(
+            user=request.user,
+            action='remove_whitelist',
+            target=ip,
+        )
         messages.success(request, f'IP address {ip} has been removed from the whitelist.')
     return redirect('settings')
 
@@ -366,6 +434,12 @@ def block_ip(request, pk):
                 reason=f"Blocked from Alert #{alert.id} ({alert.severity})",
                 added_by=request.user
             )
+            AuditLog.objects.create(
+                user=request.user,
+                action='block_ip',
+                target=alert.ip_address,
+                details=f'Blocked from Alert #{alert.id} ({alert.get_severity_display()})',
+            )
             messages.success(request, f'IP {alert.ip_address} has been added to the blocklist.')
         else:
             messages.warning(request, f'IP {alert.ip_address} is already in the blocklist.')
@@ -386,9 +460,37 @@ def unblock_ip(request, pk):
         blocked_ip = get_object_or_404(IPBlocklist, pk=pk)
         ip_addr = blocked_ip.ip_address
         blocked_ip.delete()
+        AuditLog.objects.create(
+            user=request.user,
+            action='unblock_ip',
+            target=ip_addr,
+        )
         messages.success(request, f'IP {ip_addr} has been removed from the blocklist.')
 
-    return redirect('blocklist')
+    next_url = request.POST.get('next', 'blocklist')
+    return redirect(next_url)
+
+
+@role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can unblock IP addresses.')
+def unblock_ip_by_ip(request, ip_address):
+    """
+    Action to remove an IP from the blocklist directly by its IP address string.
+    """
+    if request.method == 'POST':
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            messages.error(request, 'Access Denied: Only Administrators can unblock IPs.')
+            return redirect('blocklist')
+
+        IPBlocklist.objects.filter(ip_address=ip_address).delete()
+        AuditLog.objects.create(
+            user=request.user,
+            action='unblock_ip',
+            target=ip_address,
+        )
+        messages.success(request, f'IP {ip_address} has been removed from the blocklist.')
+
+    next_url = request.POST.get('next', 'blocklist')
+    return redirect(next_url)
 
 
 @role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can manually add IPs to the blocklist.')
@@ -413,6 +515,8 @@ def blocklist_add_ip(request):
     """
     import ipaddress  # Standard library — no extra install required
 
+    next_url = request.POST.get('next') or request.GET.get('next') or 'blocklist'
+
     if request.method == 'POST':
         raw_ip = request.POST.get('ip_address', '').strip()
         reason = request.POST.get('reason', '').strip()
@@ -420,7 +524,7 @@ def blocklist_add_ip(request):
         # ── Validation 1: Field must not be empty ───────────────────────────
         if not raw_ip:
             messages.error(request, 'IP address field cannot be empty.')
-            return redirect('blocklist')
+            return redirect(next_url)
 
         # ── Validation 2: Must be a valid IPv4 or IPv6 address ─────────────
         # ipaddress.ip_address() raises ValueError for anything that is not
@@ -433,14 +537,14 @@ def blocklist_add_ip(request):
                 f'"{raw_ip}" is not a valid IPv4 or IPv6 address. '
                 f'Example valid formats: 192.168.1.10 or 2001:db8::1'
             )
-            return redirect('blocklist')
+            return redirect(next_url)
 
         # ── Validation 3: Duplicate prevention ─────────────────────────────
         # Check for an exact match only — partial IP blocking is not supported
         # as it could cause unintended collateral blocking.
         if IPBlocklist.objects.filter(ip_address=raw_ip).exists():
             messages.warning(request, f'IP {raw_ip} is already in the blocklist.')
-            return redirect('blocklist')
+            return redirect(next_url)
 
         # ── Create the blocklist entry ──────────────────────────────────────
         IPBlocklist.objects.create(
@@ -450,6 +554,12 @@ def blocklist_add_ip(request):
             # Record which admin performed the action for audit trail
             added_by=request.user,
         )
+        AuditLog.objects.create(
+            user=request.user,
+            action='block_ip',
+            target=raw_ip,
+            details=reason or 'Manually blocked from blocklist page',
+        )
 
         messages.success(
             request,
@@ -457,8 +567,8 @@ def blocklist_add_ip(request):
             f'All future requests from this address will be blocked (403).'
         )
 
-    # Always redirect back to the blocklist page whether GET or POST
-    return redirect('blocklist')
+    # Redirect back to the referring page or the blocklist page
+    return redirect(next_url)
 
 
 @role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can access the Simulation Validation Lab.')
@@ -473,7 +583,7 @@ def simulation_lab(request):
     completed_sims = simulations.filter(status='completed').count()
     stopped_sims = simulations.filter(status='stopped').count()
     failed_sims = simulations.filter(status='failed').count()
-    active_sims = simulations.filter(status='running').count()
+    active_sims = simulations.filter(status__in=['running', 'pending']).count()
 
     context = {
         'simulations': simulations,
@@ -529,8 +639,8 @@ def start_simulation(request):
         )
 
         # Phase 12: Determine target base URL.
-        # Since simulations now attack ShopSafe directly, we target port 8080.
-        base_url = 'http://127.0.0.1:8080/'
+        # Since simulations now attack ShopSafe directly, we target port 8001.
+        base_url = 'http://127.0.0.1:8001/'
 
         # Start thread
         start_simulation_thread(sim.id, base_url)
@@ -560,7 +670,7 @@ def simulation_status_api(request):
     """
     JSON API endpoint to poll active simulation statistics.
     """
-    active_runs = SimulationRun.objects.filter(status='running')
+    active_runs = SimulationRun.objects.filter(status__in=['running', 'pending'])
     data = []
     for run in active_runs:
         processed = run.requests_sent + run.requests_blocked
@@ -752,3 +862,206 @@ def ip_investigation(request):
     return render(request, 'alerts/investigate.html', context)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  NEW VIEWS — Phase 3 Improvements
+# ═══════════════════════════════════════════════════════════════════════════
+
+@role_required('admin', 'analyst', redirect_url='dashboard', message='Access Denied.')
+def reopen_alert(request, pk):
+    """
+    Reopen a previously resolved alert for re-investigation.
+    Clears the resolved status and audit fields.
+    """
+    if request.method == 'POST':
+        alert = get_object_or_404(Alert, pk=pk)
+        alert.resolved = False
+        alert.resolved_by = None
+        alert.resolved_at = None
+        alert.save()
+
+        AuditLog.objects.create(
+            user=request.user,
+            action='reopen_alert',
+            target=f'Alert #{pk} — IP {alert.ip_address}',
+            details=f'{alert.get_severity_display()} severity alert reopened for re-investigation',
+        )
+
+        messages.info(
+            request,
+            f'Alert #{pk} has been reopened for re-investigation.'
+        )
+
+    next_url = request.POST.get('next', 'alerts_list')
+    return redirect(next_url)
+
+
+@role_required('admin', 'analyst', redirect_url='dashboard', message='Access Denied.')
+def bulk_resolve_alerts(request):
+    """
+    Bulk-resolve multiple alerts at once.
+    Supports 'resolve_selected' (specific IDs) or 'resolve_all' (all active).
+    """
+    if request.method == 'POST':
+        action = request.POST.get('bulk_action', '')
+        now = timezone.now()
+
+        if action == 'resolve_all':
+            count = Alert.objects.filter(resolved=False).update(
+                resolved=True,
+                resolved_by=request.user,
+                resolved_at=now,
+            )
+            AuditLog.objects.create(
+                user=request.user,
+                action='bulk_resolve',
+                target=f'{count} active alerts',
+                details='Resolved all active alerts via bulk action',
+            )
+            messages.success(request, f'✓ {count} active alert(s) have been resolved.')
+
+        elif action == 'resolve_selected':
+            selected_ids = request.POST.getlist('selected_alerts')
+            if selected_ids:
+                count = Alert.objects.filter(
+                    pk__in=selected_ids, resolved=False
+                ).update(
+                    resolved=True,
+                    resolved_by=request.user,
+                    resolved_at=now,
+                )
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='bulk_resolve',
+                    target=f'{count} selected alerts',
+                    details=f'Alert IDs: {', '.join(selected_ids)}',
+                )
+                messages.success(request, f'✓ {count} selected alert(s) have been resolved.')
+            else:
+                messages.warning(request, 'No alerts were selected.')
+
+    return redirect('alerts_list')
+
+
+@role_required('admin', 'analyst', redirect_url='dashboard', message='Access Denied.')
+def add_alert_note(request, pk):
+    """
+    Add an investigation note to an alert.
+    """
+    if request.method == 'POST':
+        alert = get_object_or_404(Alert, pk=pk)
+        content = request.POST.get('note_content', '').strip()
+
+        if content:
+            AlertNote.objects.create(
+                alert=alert,
+                author=request.user,
+                content=content,
+            )
+            messages.success(request, 'Investigation note added successfully.')
+        else:
+            messages.warning(request, 'Note content cannot be empty.')
+
+    return redirect('alert_detail', pk=pk)
+
+
+@role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can view the audit log.')
+def audit_log_view(request):
+    """
+    Displays the full audit trail of all user actions in the system.
+    Supports filtering by action type, user, and date range.
+    """
+    from django.contrib.auth.models import User
+
+    logs_qs = AuditLog.objects.select_related('user').all()
+
+    action_filter = request.GET.get('action', '')
+    user_filter = request.GET.get('user', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    if action_filter:
+        logs_qs = logs_qs.filter(action=action_filter)
+    
+    user_filter_int = None
+    if user_filter:
+        try:
+            user_filter_int = int(user_filter)
+            logs_qs = logs_qs.filter(user_id=user_filter_int)
+        except ValueError:
+            pass
+
+    if date_from:
+        logs_qs = logs_qs.filter(timestamp__date__gte=date_from)
+    if date_to:
+        logs_qs = logs_qs.filter(timestamp__date__lte=date_to)
+
+    paginator = Paginator(logs_qs, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'action_filter': action_filter,
+        'user_filter': user_filter_int or '',
+        'date_from': date_from,
+        'date_to': date_to,
+        'action_choices': AuditLog.ACTION_CHOICES,
+        'total_count': AuditLog.objects.count(),
+        'users': User.objects.all().order_by('username'),
+    }
+    return render(request, 'alerts/audit_log.html', context)
+
+
+@role_required('admin', 'analyst', redirect_url='dashboard', message='Access Denied.')
+def export_investigation_csv(request):
+    """
+    Export an IP investigation dossier as CSV.
+    """
+    import csv
+    from django.http import HttpResponse
+
+    ip = request.GET.get('ip', '').strip()
+    if not ip:
+        messages.error(request, 'No IP address specified for export.')
+        return redirect('ip_investigation')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="netwatch_investigation_{ip}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['NetWatch Investigation Dossier', f'IP: {ip}', f'Generated: {timezone.now().strftime("%Y-%m-%d %H:%M:%S")}'])
+    writer.writerow([])
+
+    # Alerts section
+    writer.writerow(['=== ALERTS ==='])
+    writer.writerow(['ID', 'Severity', 'Type', 'Request Count', 'Message', 'Resolved', 'Timestamp'])
+    for alert in Alert.objects.filter(ip_address=ip).order_by('-timestamp'):
+        writer.writerow([
+            alert.id, alert.get_severity_display(), alert.get_detection_type_display(),
+            alert.request_count, alert.message, 'Yes' if alert.resolved else 'No',
+            alert.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+
+    writer.writerow([])
+
+    # Traffic logs section (limit 500)
+    writer.writerow(['=== TRAFFIC LOGS (Last 500) ==='])
+    writer.writerow(['URL', 'Method', 'Timestamp'])
+    for log in TrafficLog.objects.filter(ip_address=ip).order_by('-timestamp')[:500]:
+        writer.writerow([
+            log.url_accessed, log.request_method,
+            log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+
+    writer.writerow([])
+
+    # Rate limit violations section
+    writer.writerow(['=== RATE LIMIT VIOLATIONS ==='])
+    writer.writerow(['Request Count', 'Threshold', 'Path', 'Method', 'Timestamp'])
+    for v in RateLimitViolation.objects.filter(ip_address=ip).order_by('-timestamp'):
+        writer.writerow([
+            v.request_count, v.threshold, v.path, v.request_method,
+            v.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+
+    return response
