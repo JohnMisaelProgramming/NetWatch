@@ -35,3 +35,7 @@ netwatch.log
 full_test.log
 sidebar_test.log
 sidebar_test_utf8.txt
+
+# Django cache files
+.django_cache/
+
