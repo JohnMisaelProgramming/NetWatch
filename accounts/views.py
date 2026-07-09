@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from django.views.decorators.http import require_POST
+from django.contrib.auth.models import User  # type: ignore
 
 from accounts.access import get_user_role
 
@@ -17,8 +18,7 @@ def login_view(request):
         # Support logging in via email
         if username and '@' in username:
             try:
-                from django.contrib.auth.models import User
-                user_obj = User.objects.get(email__iexact=username)
+                user_obj = User.objects.get(email__iexact=username)  # type: ignore
                 username = user_obj.username
             except User.DoesNotExist:
                 pass
@@ -61,7 +61,7 @@ def profile_view(request):
     profile = getattr(request.user, 'profile', None)
     if not profile:
         from accounts.models import Profile
-        profile = Profile.objects.create(user=request.user)
+        profile = Profile.objects.create(user=request.user)  # type: ignore
 
     if request.method == 'POST':
         # Get POST fields
@@ -91,7 +91,7 @@ def profile_view(request):
 
         # Add to Audit Log
         from alerts.models import AuditLog
-        AuditLog.objects.create(
+        AuditLog.objects.create(  # type: ignore
             user=request.user,
             action='update_settings',
             target=f"Profile: {request.user.username}",
@@ -123,7 +123,7 @@ def change_password_view(request):
 
             # Create audit log entry
             from alerts.models import AuditLog
-            AuditLog.objects.create(
+            AuditLog.objects.create(  # type: ignore
                 user=request.user,
                 action='change_password',
                 target=request.user.username,

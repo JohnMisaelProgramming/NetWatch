@@ -224,7 +224,7 @@ def dashboard_recent_stats(request):
     from alerts.models import MonitoringSnapshot
     import json
 
-    snapshot = MonitoringSnapshot.objects.order_by('-timestamp').first()
+    snapshot = MonitoringSnapshot.objects.order_by('-timestamp').first()  # type: ignore
     if snapshot:
         try:
             top_ips = json.loads(snapshot.top_ips_json)
