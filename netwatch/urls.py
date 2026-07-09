@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 
 from dashboard.views import dashboard_data
-from traffic.ingest_api import ingest_traffic, ingest_event   # External traffic ingest API
+from traffic.ingest_api import ingest_traffic, ingest_event, check_ip_status   # External traffic ingest API
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +28,7 @@ urlpatterns = [
     # This must be registered BEFORE the catch-all includes below.
     path('api/ingest/', ingest_traffic, name='api_ingest'),
     path('api/events/', ingest_event, name='api_ingest_event'),
+    path('api/check-block/', check_ip_status, name='api_check_block'),
 
     path('dashboard/data/', dashboard_data, name='dashboard_data'),
     path('', include('dashboard.urls')),   # Dashboard + Analytics

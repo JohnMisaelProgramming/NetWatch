@@ -237,3 +237,36 @@ def ingest_event(request):
         status=201
     )
 
+
+@csrf_exempt
+def check_ip_status(request):
+    """
+    GET /api/check-block/?ip=<ip>
+
+    Checks if a given client IP is currently blocked or whitelisted in NetWatch.
+    Authenticated via NetWatch API Key in headers (Authorization: Api-Key <NETWATCH_API_KEY>).
+    """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Api-Key '):
+        return JsonResponse({'error': 'Missing Authorization header.'}, status=403)
+
+    provided_key = auth_header[len('Api-Key '):]
+    expected_key = getattr(settings, 'NETWATCH_API_KEY', None)
+    if not expected_key or provided_key != expected_key:
+        return JsonResponse({'error': 'Invalid API key.'}, status=403)
+
+    ip = request.GET.get('ip', '').strip()
+    if not ip:
+        return JsonResponse({'error': 'ip parameter is required.'}, status=400)
+
+    from alerts.models import IPBlocklist, IPWhitelist
+
+    # Check Whitelist
+    is_whitelisted = IPWhitelist.objects.filter(ip_address=ip).exists()  # type: ignore
+    if is_whitelisted:
+        return JsonResponse({'blocked': False, 'whitelisted': True})
+
+    # Check Blocklist
+    is_blocked = IPBlocklist.objects.filter(ip_address=ip).exists()  # type: ignore
+    return JsonResponse({'blocked': is_blocked, 'whitelisted': False})
+
