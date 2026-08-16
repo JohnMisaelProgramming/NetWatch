@@ -310,4 +310,210 @@
   </div>
 </div>
 
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 3 — Block by Device / User-Agent Panel                            #}
+{# Allows administrators to block requests from specific tools/devices based #}
+{# on their User-Agent string, regardless of IP address.                     #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="add-ip-panel" style="margin-top:28px; border-color:rgba(168,85,247,0.25);">
+
+  <div class="add-ip-title">
+    <i class="bi bi-phone-fill" style="color:var(--nw-accent); font-size:16px;"></i>
+    Block by Device / User-Agent
+  </div>
+
+  <form method="post" action="{% url 'device_block_add' %}">
+    {% csrf_token %}
+
+    <div class="add-ip-form-row">
+
+      {# ── Identifier field ──────────────────────────────────────────── #}
+      <div class="add-ip-group" style="flex:1;">
+        <label class="add-ip-label" for="id_device_identifier">
+          User-Agent Pattern <span style="color:var(--nw-danger);">*</span>
+        </label>
+        <input
+          type="text"
+          id="id_device_identifier"
+          name="identifier"
+          class="add-ip-input"
+          placeholder="e.g. python-requests, curl, AttackBot"
+          autocomplete="off"
+          required
+          style="width:100%; font-family:'Courier New',monospace;"
+        />
+      </div>
+
+      {# ── Match Type Selector ───────────────────────────────────────── #}
+      <div class="add-ip-group">
+        <label class="add-ip-label" for="id_match_type">
+          Match Type
+        </label>
+        <select
+          id="id_match_type"
+          name="match_type"
+          class="add-ip-input"
+          style="font-family:'Inter',sans-serif; min-width:140px; cursor:pointer;"
+        >
+          <option value="contains" selected>Contains</option>
+          <option value="exact">Exact Match</option>
+        </select>
+      </div>
+
+      {# ── Reason field (optional) ───────────────────────────────────── #}
+      <div class="add-ip-group" style="flex:1;">
+        <label class="add-ip-label" for="id_device_reason">
+          Block Reason <span style="color:var(--nw-text-muted);">(optional)</span>
+        </label>
+        <input
+          type="text"
+          id="id_device_reason"
+          name="reason"
+          class="add-ip-input add-ip-reason"
+          placeholder="e.g. Automated attack tool, suspicious bot"
+          maxlength="255"
+          style="width:100%;"
+        />
+      </div>
+
+      {# ── Submit ────────────────────────────────────────────────────── #}
+      <div class="add-ip-group" style="align-self:flex-end;">
+        <button type="submit" class="btn-block-ip" style="border-color:rgba(168,85,247,0.4); background:rgba(168,85,247,0.15); color:var(--nw-accent);"
+          onmouseover="this.style.background='rgba(168,85,247,0.28)'"
+          onmouseout="this.style.background='rgba(168,85,247,0.15)'"
+          onclick="return confirm('Block all requests from devices matching this User-Agent pattern?');">
+          <i class="bi bi-phone-fill"></i>
+          Block Device
+        </button>
+      </div>
+
+    </div>
+
+    {# ── Validation hint ───────────────────────────────────────────── #}
+    <div style="margin-top:10px; font-size:11px; color:var(--nw-text-muted);">
+      <i class="bi bi-info-circle"></i>
+      <strong>Contains</strong> blocks any request whose User-Agent includes the pattern (case-insensitive).
+      <strong>Exact Match</strong> requires the full User-Agent string to match exactly.
+      Examples: <code style="color:var(--nw-info);">python-requests</code>,
+      <code style="color:var(--nw-info);">curl</code>,
+      <code style="color:var(--nw-info);">AttackBot/1.0</code>
+    </div>
+
+  </form>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# SECTION 4 — Blocked Devices Table                                         #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div class="nw-card" style="padding:0; overflow:hidden; margin-top:24px;">
+  <div class="nw-section-header" style="padding:16px 20px 0;">
+    <div class="nw-section-title">
+      <i class="bi bi-phone-fill" style="color:var(--nw-accent);"></i>
+      Blocked Devices / User-Agents
+    </div>
+    <span class="nw-badge" style="background:rgba(168,85,247,0.12); color:var(--nw-accent); border:1px solid rgba(168,85,247,0.25);">
+      {{ device_blocklist|length }} Device Block{{ device_blocklist|length|pluralize }}
+    </span>
+  </div>
+  <div style="height:1px; background:var(--nw-border); margin:12px 0 0;"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="nw-table">
+      <thead>
+        <tr>
+          <th>User-Agent Pattern</th>
+          <th>Match Type</th>
+          <th>Block Reason</th>
+          <th>Blocked At</th>
+          <th>Added By</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in device_blocklist %}
+        <tr>
+
+          {# Identifier #}
+          <td>
+            <span class="blocked-ip-chip" style="color:var(--nw-accent); background:rgba(168,85,247,0.08); border-color:rgba(168,85,247,0.2);">
+              {{ d.identifier }}
+            </span>
+          </td>
+
+          {# Match Type Badge #}
+          <td>
+            <span class="nw-badge" style="font-size:11px; {% if d.match_type == 'exact' %}background:rgba(99,102,241,0.12); color:#818cf8; border:1px solid rgba(99,102,241,0.25);{% else %}background:rgba(245,158,11,0.12); color:var(--nw-warning); border:1px solid rgba(245,158,11,0.25);{% endif %}">
+              {% if d.match_type == 'exact' %}
+                <i class="bi bi-bullseye"></i> Exact
+              {% else %}
+                <i class="bi bi-search"></i> Contains
+              {% endif %}
+            </span>
+          </td>
+
+          {# Reason #}
+          <td>
+            <span class="reason-cell">{{ d.reason|default:"—" }}</span>
+          </td>
+
+          {# Date #}
+          <td>
+            <span class="nw-timestamp">{{ d.added_at|date:"d M Y" }}</span>
+            <div style="font-size:11px; color:var(--nw-text-muted);">
+              {{ d.added_at|date:"H:i" }} UTC
+            </div>
+          </td>
+
+          {# Added By #}
+          <td>
+            <span class="added-by-cell">
+              {% if d.added_by %}
+                <i class="bi bi-person-fill" style="color:var(--nw-accent);"></i>
+                {{ d.added_by.username }}
+              {% else %}
+                <i class="bi bi-cpu-fill" style="color:var(--nw-text-muted);"></i>
+                System
+              {% endif %}
+            </span>
+          </td>
+
+          {# Delete #}
+          <td style="text-align:right;">
+            <form method="post" action="{% url 'device_block_delete' d.pk %}"
+              onsubmit="return confirm('Remove device pattern &quot;{{ d.identifier }}&quot; from the blocklist?\nRequests from this device/tool will be allowed again.');">
+              {% csrf_token %}
+              <button type="submit"
+                style="padding:6px 14px; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3);
+                  color:var(--nw-success); border-radius:7px; font-size:12px; font-weight:600;
+                  cursor:pointer; font-family:'Inter',sans-serif; display:inline-flex; align-items:center; gap:5px;
+                  transition:all 0.2s;"
+                onmouseover="this.style.background='rgba(34,197,94,0.2)'"
+                onmouseout="this.style.background='rgba(34,197,94,0.1)'">
+                <i class="bi bi-unlock-fill"></i> Remove
+              </button>
+            </form>
+          </td>
+
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="nw-empty-state" style="padding:40px 20px;">
+              <i class="bi bi-phone" style="color:var(--nw-accent); font-size:40px; opacity:0.7;"></i>
+              <p style="color:var(--nw-accent); font-size:14px; font-weight:600; margin:8px 0 4px;">
+                No devices are currently blocked.
+              </p>
+              <p style="font-size:12px; color:var(--nw-text-muted); margin:0;">
+                Use the form above to block requests from a specific User-Agent pattern.
+              </p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}

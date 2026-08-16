@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 
 from accounts.access import role_required
-from alerts.models import Alert, SystemSettings, IPBlocklist, RateLimitViolation, SimulationRun, IPWhitelist, AuditLog, AlertNote
+from alerts.models import Alert, SystemSettings, IPBlocklist, RateLimitViolation, SimulationRun, IPWhitelist, AuditLog, AlertNote, DeviceBlocklist
 from traffic.models import TrafficLog
 from alerts.simulation import start_simulation_thread, stop_simulation_thread
 
@@ -409,10 +409,14 @@ def rate_limit_history(request):
 @role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can view the blocklist.')
 def blocklist_view(request):
     """
-    Displays the current IP blocklist.
+    Displays the current IP blocklist and Device blocklist.
     """
     blocklist = IPBlocklist.objects.all()
-    return render(request, 'alerts/blocklist.html', {'blocklist': blocklist})
+    device_blocklist = DeviceBlocklist.objects.all()
+    return render(request, 'alerts/blocklist.html', {
+        'blocklist': blocklist,
+        'device_blocklist': device_blocklist,
+    })
 
 
 @role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can block IP addresses.')
@@ -568,6 +572,79 @@ def blocklist_add_ip(request):
         )
 
     # Redirect back to the referring page or the blocklist page
+    return redirect(next_url)
+
+
+@role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can manage the device blocklist.')
+def device_block_add(request):
+    """
+    Add a User-Agent pattern to the Device Blocklist.
+
+    Supports two match types:
+    - 'contains': Blocks any request whose User-Agent contains the given substring (case-insensitive)
+    - 'exact':    Blocks only requests whose User-Agent matches exactly (case-sensitive)
+
+    This is useful for blocking entire classes of tools (e.g., 'python-requests', 'curl')
+    regardless of which IP address they come from.
+    """
+    next_url = request.POST.get('next') or request.GET.get('next') or 'blocklist'
+
+    if request.method == 'POST':
+        identifier = request.POST.get('identifier', '').strip()
+        match_type = request.POST.get('match_type', 'contains').strip()
+        reason = request.POST.get('reason', '').strip()
+
+        if not identifier:
+            messages.error(request, 'Device identifier (User-Agent pattern) cannot be empty.')
+            return redirect(next_url)
+
+        if match_type not in ('exact', 'contains'):
+            match_type = 'contains'
+
+        # Duplicate prevention
+        if DeviceBlocklist.objects.filter(identifier=identifier, match_type=match_type).exists():
+            messages.warning(request, f'Device pattern "{identifier}" ({match_type}) is already blocked.')
+            return redirect(next_url)
+
+        DeviceBlocklist.objects.create(
+            identifier=identifier,
+            match_type=match_type,
+            reason=reason or 'Manually blocked by administrator',
+            added_by=request.user,
+        )
+        AuditLog.objects.create(
+            user=request.user,
+            action='block_device',
+            target=f'{identifier} ({match_type})',
+            details=reason or 'Manually blocked from blocklist page',
+        )
+        messages.success(
+            request,
+            f'Device pattern "{identifier}" ({match_type} match) has been blocked. '
+            f'Matching requests will receive 403 Forbidden.'
+        )
+
+    return redirect(next_url)
+
+
+@role_required('admin', redirect_url='dashboard', message='Access Denied: Only Administrators can manage the device blocklist.')
+def device_block_delete(request, pk):
+    """
+    Remove a device pattern from the Device Blocklist.
+    """
+    if request.method == 'POST':
+        entry = get_object_or_404(DeviceBlocklist, pk=pk)
+        identifier = entry.identifier
+        match_type = entry.match_type
+        entry.delete()
+        AuditLog.objects.create(
+            user=request.user,
+            action='unblock_device',
+            target=f'{identifier} ({match_type})',
+        )
+        messages.success(request, f'Device pattern "{identifier}" has been removed from the blocklist.')
+
+    next_url = request.POST.get('next', 'blocklist')
     return redirect(next_url)
 
 

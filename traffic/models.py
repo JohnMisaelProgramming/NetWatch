@@ -4,6 +4,7 @@ class TrafficLog(models.Model):
     ip_address = models.CharField(max_length=100, db_index=True)  # Supports both IPv4 and IPv6, indexed for speed
     url_accessed = models.CharField(max_length=255)
     request_method = models.CharField(max_length=10, db_index=True)  # e.g., GET, POST — indexed for filtered queries
+    user_agent = models.CharField(max_length=500, blank=True, default='')  # Device/browser identifier for device blocking
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)  # Indexed for time-window scans
 
     def __str__(self):

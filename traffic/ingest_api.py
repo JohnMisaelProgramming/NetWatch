@@ -116,7 +116,8 @@ def ingest_traffic(request):
     ip_address = data.get('ip_address', '').strip()
     url_accessed = data.get('url_accessed', '').strip()
     request_method = data.get('request_method', '').strip().upper()
-    source = data.get('source', 'external').strip()    # Optional metadata
+    user_agent = data.get('user_agent', '').strip()     # Device identifier (optional)
+    source = data.get('source', 'external').strip()     # Optional metadata
 
     # Collect all missing fields to return a helpful error message
     missing_fields = []
@@ -147,6 +148,7 @@ def ingest_traffic(request):
         ip_address=ip_address,
         url_accessed=url_accessed,
         request_method=request_method,
+        user_agent=user_agent[:500],  # Truncate to field max_length
     )
 
     # ── Step 5: Return Success ──────────────────────────────────────────────
@@ -241,9 +243,9 @@ def ingest_event(request):
 @csrf_exempt
 def check_ip_status(request):
     """
-    GET /api/check-block/?ip=<ip>
+    GET /api/check-block/?ip=<ip>&ua=<user_agent>
 
-    Checks if a given client IP is currently blocked or whitelisted in NetWatch.
+    Checks if a given client IP or User-Agent is currently blocked or whitelisted in NetWatch.
     Authenticated via NetWatch API Key in headers (Authorization: Api-Key <NETWATCH_API_KEY>).
     """
     auth_header = request.META.get('HTTP_AUTHORIZATION', '')
@@ -256,17 +258,48 @@ def check_ip_status(request):
         return JsonResponse({'error': 'Invalid API key.'}, status=403)
 
     ip = request.GET.get('ip', '').strip()
+    user_agent = request.GET.get('ua', '').strip()
+
     if not ip:
         return JsonResponse({'error': 'ip parameter is required.'}, status=400)
 
-    from alerts.models import IPBlocklist, IPWhitelist
+    from alerts.models import IPBlocklist, IPWhitelist, DeviceBlocklist
+    from django.core.cache import cache
 
     # Check Whitelist
     is_whitelisted = IPWhitelist.objects.filter(ip_address=ip).exists()  # type: ignore
     if is_whitelisted:
-        return JsonResponse({'blocked': False, 'whitelisted': True})
+        return JsonResponse({'blocked': False, 'whitelisted': True, 'device_blocked': False})
 
-    # Check Blocklist
+    # Check IP Blocklist
     is_blocked = IPBlocklist.objects.filter(ip_address=ip).exists()  # type: ignore
-    return JsonResponse({'blocked': is_blocked, 'whitelisted': False})
+
+    # Check Device Blocklist
+    is_device_blocked = False
+    blocked_pattern = None
+    if user_agent:
+        entries = cache.get('device_blocklist_entries')
+        if entries is None:
+            entries = list(DeviceBlocklist.objects.values_list('identifier', 'match_type'))
+            cache.set('device_blocklist_entries', entries, timeout=60)
+
+        ua_lower = user_agent.lower()
+        for identifier, match_type in entries:
+            if match_type == 'exact':
+                if user_agent == identifier:
+                    is_device_blocked = True
+                    blocked_pattern = identifier
+                    break
+            else:  # 'contains'
+                if identifier.lower() in ua_lower:
+                    is_device_blocked = True
+                    blocked_pattern = identifier
+                    break
+
+    return JsonResponse({
+        'blocked': is_blocked,
+        'whitelisted': False,
+        'device_blocked': is_device_blocked,
+        'blocked_pattern': blocked_pattern
+    })
 

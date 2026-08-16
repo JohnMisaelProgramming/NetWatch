@@ -314,6 +314,8 @@ class AuditLog(models.Model):
         ('reopen_alert', 'Reopened Alert'),
         ('block_ip', 'Blocked IP'),
         ('unblock_ip', 'Unblocked IP'),
+        ('block_device', 'Blocked Device'),
+        ('unblock_device', 'Unblocked Device'),
         ('whitelist_ip', 'Whitelisted IP'),
         ('remove_whitelist', 'Removed Whitelist'),
         ('update_settings', 'Updated Settings'),
@@ -384,3 +386,50 @@ class SecurityEvent(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+
+
+class DeviceBlocklist(models.Model):
+    """
+    Stores User-Agent patterns that are blocked from accessing the system.
+    Allows blocking by device/browser/tool identity instead of IP address.
+    Useful when attackers use rotating IPs but the same tool (e.g., python-requests, curl).
+    """
+    MATCH_EXACT = 'exact'
+    MATCH_CONTAINS = 'contains'
+    MATCH_TYPE_CHOICES = [
+        (MATCH_CONTAINS, 'Contains'),
+        (MATCH_EXACT, 'Exact Match'),
+    ]
+
+    identifier = models.CharField(
+        max_length=500,
+        help_text='The User-Agent string or substring to block.',
+    )
+    match_type = models.CharField(
+        max_length=10,
+        choices=MATCH_TYPE_CHOICES,
+        default=MATCH_CONTAINS,
+        help_text='How to match the identifier against incoming User-Agent headers.',
+    )
+    reason = models.CharField(max_length=255, blank=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+    )
+
+    def __str__(self):
+        return f"BLOCKED DEVICE ({self.match_type}): {self.identifier}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Invalidate cached device blocklist so changes take effect immediately
+        from django.core.cache import cache
+        cache.delete('device_blocklist_entries')
+
+    def delete(self, *args, **kwargs):
+        from django.core.cache import cache
+        cache.delete('device_blocklist_entries')
+        super().delete(*args, **kwargs)
+
+    class Meta:
+        ordering = ['-added_at']

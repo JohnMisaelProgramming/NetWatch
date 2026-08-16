@@ -202,6 +202,9 @@
     <p class="nw-error-desc">
       {% if is_blocked_ip %}
         Your IP address has been blocked due to suspicious activity (e.g. traffic spikes or rate-limit violations) and added to the network blocklist.
+      {% elif is_blocked_device %}
+        Your device or tool has been blocked by the NetWatch Security Center.
+        The User-Agent pattern <strong style="color:var(--nw-danger);">"{{ blocked_device_pattern }}"</strong> is on the device blocklist.
       {% else %}
         You do not have the required access permissions to view this resource. 
         If you believe this is an error, please contact your security administrator.
@@ -229,18 +232,28 @@
       <div class="nw-meta-row">
         <span class="nw-meta-label">Status Flag:</span>
         <span class="nw-meta-value text-uppercase" style="color: var(--nw-danger);">
-          {% if is_blocked_ip %}Blocked IP{% else %}Unauthorized{% endif %}
+          {% if is_blocked_ip %}Blocked IP{% elif is_blocked_device %}Blocked Device{% else %}Unauthorized{% endif %}
         </span>
       </div>
+      {% if is_blocked_device %}
+      <div class="nw-meta-row">
+        <span class="nw-meta-label">Blocked Pattern:</span>
+        <span class="nw-meta-value" style="color: var(--nw-danger);">{{ blocked_device_pattern }}</span>
+      </div>
+      {% endif %}
     </div>
 
     <!-- Buttons Navigation -->
     <div class="nw-btn-group w-100">
-      {% if is_blocked_ip %}
-        <!-- No navigation allowed since their IP is explicitly blocked -->
+      {% if is_blocked_ip or is_blocked_device %}
+        <!-- No navigation allowed since their IP/device is explicitly blocked -->
         <div class="alert alert-danger w-100 text-center d-flex align-items-center justify-content-center gap-2 m-0" style="font-size: 14px; font-weight: 600; border-radius: 8px;">
           <i class="bi bi-shield-lock-fill" style="font-size: 18px;"></i>
-          <span>Terminal Access Terminated: Your IP address is restricted.</span>
+          <span>
+            {% if is_blocked_ip %}Terminal Access Terminated: Your IP address is restricted.
+            {% else %}Terminal Access Terminated: Your device/tool is restricted.
+            {% endif %}
+          </span>
         </div>
       {% else %}
         {% if request.user.is_authenticated %}
